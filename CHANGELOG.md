@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] - 2026-09-28
+
+Release Pactium under the MIT license.
+
+### Changed
+
+- Change the current package license to MIT without changing protocol or runtime behavior.
+
 ## [0.8.0] - 2026-08-13
 
 Bound Pactium event, Merkle mutation, and CAS retention work independently of accumulated history.
@@ -269,6 +277,7 @@ This is the first public release of Pactium as a proof-first protocol substrate.
 - Ed25519 signing support for Ledger Heads
 - Signed head verification with verifier manifest validation
 
+[0.8.1]: https://github.com/Unka-Malloc/Pactium/releases/tag/v0.8.1
 [0.8.0]: https://github.com/Unka-Malloc/Pactium/releases/tag/v0.8.0
 [0.7.0]: https://github.com/Unka-Malloc/Pactium/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Unka-Malloc/Pactium/releases/tag/v0.6.0
