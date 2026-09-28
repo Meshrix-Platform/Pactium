@@ -214,4 +214,4 @@ These belong in the host system that embeds Pactium, not in the protocol substra
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [GPL-3.0-or-later](./LICENSE) license.
+By contributing, you agree that your contributions will be licensed under the [MIT License](./LICENSE).
