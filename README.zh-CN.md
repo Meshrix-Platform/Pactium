@@ -139,4 +139,4 @@ npm run verify:release
 
 ## 许可证
 
-GPL-3.0-or-later。参见 [LICENSE](./LICENSE)。
+MIT 许可证。参见 [LICENSE](./LICENSE)。
