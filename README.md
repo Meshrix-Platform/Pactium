@@ -137,4 +137,4 @@ npm run verify:release
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](./LICENSE).
+MIT License. See [LICENSE](./LICENSE).
