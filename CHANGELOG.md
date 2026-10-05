@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.3] - 2026-10-05
+
+Re-release Pactium under the Apache-2.0 license.
+
+### Changed
+
+- Change the package license from MIT to Apache-2.0 without changing protocol or runtime behavior.
+
 ## [0.8.2] - 2026-10-05
 
 Move the canonical repository to the Meshrix-Platform organization and refresh release metadata.
@@ -286,6 +294,7 @@ This is the first public release of Pactium as a proof-first protocol substrate.
 - Ed25519 signing support for Ledger Heads
 - Signed head verification with verifier manifest validation
 
+[0.8.3]: https://github.com/Meshrix-Platform/Pactium/releases/tag/v0.8.3
 [0.8.2]: https://github.com/Meshrix-Platform/Pactium/releases/tag/v0.8.2
 [0.8.1]: https://github.com/Meshrix-Platform/Pactium/releases/tag/v0.8.1
 [0.8.0]: https://github.com/Meshrix-Platform/Pactium/releases/tag/v0.8.0

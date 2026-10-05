@@ -139,4 +139,4 @@ npm run verify:release
 
 ## 许可证
 
-MIT 许可证。参见 [LICENSE](./LICENSE)。
+Apache-2.0 许可证。参见 [LICENSE](./LICENSE)。
