@@ -41,7 +41,7 @@ Pactium should be embedded behind the host system's security boundary.
 
 ### Preferred method
 
-Report security issues privately through [GitHub Security Advisories](https://github.com/Unka-Malloc/Pactium/security/advisories/new).
+Report security issues privately through [GitHub Security Advisories](https://github.com/Meshrix-Platform/Pactium/security/advisories/new).
 
 ### Alternative method
 
