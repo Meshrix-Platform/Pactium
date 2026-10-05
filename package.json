@@ -1,17 +1,17 @@
 {
   "name": "pactium",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Proof-first protocol substrate for verifiable operation facts, append-only recovery history, and cryptographic state verification.",
   "author": "Unka Y.Y.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Unka-Malloc/Pactium.git"
+    "url": "git+https://github.com/Meshrix-Platform/Pactium.git"
   },
   "bugs": {
-    "url": "https://github.com/Unka-Malloc/Pactium/issues"
+    "url": "https://github.com/Meshrix-Platform/Pactium/issues"
   },
-  "homepage": "https://github.com/Unka-Malloc/Pactium#readme",
+  "homepage": "https://github.com/Meshrix-Platform/Pactium#readme",
   "funding": {
     "type": "github",
     "url": "https://github.com/sponsors/Unka-Malloc"
