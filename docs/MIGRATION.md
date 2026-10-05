@@ -101,7 +101,7 @@ New host-neutral helpers (canonical-safe projection, data-directory preflight, c
 2. Call the Pactium export as the authoritative implementation.
 3. Keep any superseded host-local wrapper only as a Deprecated delegate until the host's next major release removes it.
 
-Pactium itself does not retain host-specific compatibility shims. See [Contributing: Host Capability Intake Workflow](https://github.com/Unka-Malloc/Pactium/blob/stable/CONTRIBUTING.md#host-capability-intake-workflow).
+Pactium itself does not retain host-specific compatibility shims. See [Contributing: Host Capability Intake Workflow](https://github.com/Meshrix-Platform/Pactium/blob/stable/CONTRIBUTING.md#host-capability-intake-workflow).
 
 ## Breaking Change Announcements
 

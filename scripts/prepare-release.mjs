@@ -240,7 +240,7 @@ async function updateChangelog({ version, currentVersion, date, summary, entries
     entries: nextEntries
   })}`);
 
-  const releaseRef = `[${version}]: https://github.com/Unka-Malloc/Pactium/releases/tag/v${version}`;
+  const releaseRef = `[${version}]: https://github.com/Meshrix-Platform/Pactium/releases/tag/v${version}`;
   if (!next.includes(`[${version}]:`)) {
     const firstReference = /\n\[\d+\.\d+\.\d+\]: /;
     if (firstReference.test(next)) {

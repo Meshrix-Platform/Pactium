@@ -29,14 +29,14 @@ Welcome to the Pactium documentation. This index covers all maintained documenta
 | Document | Description |
 | --- | --- |
 | [Migration Guide](./MIGRATION.md) | Version compatibility, upgrade guidance, and breaking changes |
-| [Quality Gates](https://github.com/Unka-Malloc/Pactium/blob/stable/docs/QUALITY-GATES.md) | Release verification requirements and automated gate coverage |
-| [Release Rules](https://github.com/Unka-Malloc/Pactium/blob/stable/docs/RELEASE.md) | Release process and publication criteria |
+| [Quality Gates](https://github.com/Meshrix-Platform/Pactium/blob/stable/docs/QUALITY-GATES.md) | Release verification requirements and automated gate coverage |
+| [Release Rules](https://github.com/Meshrix-Platform/Pactium/blob/stable/docs/RELEASE.md) | Release process and publication criteria |
 
 ## Decisions
 
 | Document | Description |
 | --- | --- |
-| [ADR Index](https://github.com/Unka-Malloc/Pactium/tree/stable/docs/adr) | Architecture Decision Records covering protocol design choices |
+| [ADR Index](https://github.com/Meshrix-Platform/Pactium/tree/stable/docs/adr) | Architecture Decision Records covering protocol design choices |
 
 ## Documentation Principles
 

@@ -38,7 +38,7 @@ const checks = [
   { pattern: new RegExp(`\\b${oldPactMcpCommand}\\b`, "g"), reason: "old MCP command" },
   { pattern: new RegExp(`\\b${oldPactClientCommand}\\b`, "g"), reason: "old client command" },
   { pattern: new RegExp(`\\b${oldPactServerIdentifier}\\b`, "g"), reason: "old server identifier" },
-  { pattern: /Unka-Malloc\/Pact(?!ium)/g, reason: "old repository identity" },
+  { pattern: /Unka-Malloc\/Pact/g, reason: "old repository identity" },
   { pattern: /\bO-Sys-It\b/g, reason: "old product positioning" }
 ];
 

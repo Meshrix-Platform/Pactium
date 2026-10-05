@@ -15,7 +15,7 @@ Not sure where to start? Here are some good entry points:
 3. **Report bugs** -- file a clear issue with reproduction steps
 4. **Review ADRs** -- read the [Architecture Decision Records](./docs/adr/) to understand design context
 
-Look for issues labeled `good first issue` or `help wanted` in [GitHub Issues](https://github.com/Unka-Malloc/Pactium/issues).
+Look for issues labeled `good first issue` or `help wanted` in [GitHub Issues](https://github.com/Meshrix-Platform/Pactium/issues).
 
 ## Getting Started
 
@@ -29,7 +29,7 @@ Look for issues labeled `good first issue` or `help wanted` in [GitHub Issues](h
 
 ```bash
 # Clone the repository
-git clone https://github.com/Unka-Malloc/Pactium.git
+git clone https://github.com/Meshrix-Platform/Pactium.git
 cd Pactium
 
 # Install dependencies
@@ -208,7 +208,7 @@ These belong in the host system that embeds Pactium, not in the protocol substra
 
 ## Reporting Issues
 
-- Use [GitHub Issues](https://github.com/Unka-Malloc/Pactium/issues) for bug reports and feature requests
+- Use [GitHub Issues](https://github.com/Meshrix-Platform/Pactium/issues) for bug reports and feature requests
 - For security vulnerabilities, see [SECURITY.md](./SECURITY.md)
 - Include the Node.js version, Pactium version, and a minimal reproduction
 
