@@ -21,7 +21,7 @@ Look for issues labeled `good first issue` or `help wanted` in [GitHub Issues](h
 
 ### Prerequisites
 
-- Node.js 22+ or Node.js 24+
+- Node.js 22.19+ or Node.js 24.3+
 - npm 10+
 - Git
 

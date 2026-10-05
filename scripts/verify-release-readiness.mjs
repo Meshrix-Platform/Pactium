@@ -525,7 +525,9 @@ async function verifyNodeLtsMatrix(findings) {
   const releaseRules = await readText("docs/RELEASE.md");
   const supported = ["22", "24"];
   for (const major of supported) {
-    if (!String(packageJson.engines?.node || "").includes(`^${major}.0.0`)) {
+    const engineRange = String(packageJson.engines?.node || "");
+    const declaresMajor = engineRange.includes(`^${major}.`) || engineRange.includes(`>=${major}.`);
+    if (!declaresMajor) {
       addFinding(findings, "package.json", "missing_lts_engine", `Node.js ${major} is missing from engines.node.`);
     }
     if (!new RegExp(`\\b${major}\\b`).test(workflow)) {
