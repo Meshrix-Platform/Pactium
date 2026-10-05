@@ -77,7 +77,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": "^22.0.0 || ^24.0.0"
+    "node": ">=22.19.0 <23 || >=24.3.0 <25"
   },
   "scripts": {
     "start": "pactium serve",
