@@ -46,7 +46,7 @@ The host owns content minimization, authorization, disclosure, retention, and re
 npm install pactium
 ```
 
-Requirements: Node.js 22 or 24, ESM only.
+Requirements: Node.js 22.19+ or 24.3+, ESM only.
 
 ## Quick start
 
