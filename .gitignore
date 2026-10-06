@@ -78,3 +78,6 @@ test-results/
 .gemini/
 .impeccable/
 .github/skills/
+
+# Private local audit reports
+/.general-auditor/local/
