@@ -330,6 +330,10 @@ export function createStateCommitStore({
           );
         }
         await saveStateRoot(scope, afterRoot);
+        // The payload digest must ride inside the hashed event record: the
+        // commit's payloadHash derives its integrity from eventHash, so a
+        // stored commit cannot repoint its payload digest without breaking
+        // the event chain.
         const event = await resolvedEventLog.appendEvent({
           partitionId: scope,
           operationId,
