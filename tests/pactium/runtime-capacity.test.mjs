@@ -188,7 +188,7 @@ describe("Pactium bounded runtime structures", () => {
     await log.appendEvents(Array.from({ length: 17 }, (_, index) => ({
       partitionId: "p",
       operationId: `op-${index}`,
-      payload: { index }
+      payloadHash: `sha256:test-${index}`
     })));
     const segments = [...storage.objects.entries()]
       .filter(([id]) => id.includes("event-log-segment:p:"))
@@ -315,7 +315,7 @@ describe("Pactium bounded runtime structures", () => {
       /one partition per batch/
     );
     await assert.rejects(
-      log.appendEvent({ partitionId: "oversize", payload: { value: "x".repeat(5000) } }),
+      log.appendEvent({ partitionId: "oversize", payloadHash: "x".repeat(5000) }),
       /exceeds the configured segment byte limit/
     );
 
@@ -375,8 +375,8 @@ describe("Pactium bounded runtime structures", () => {
     });
     assert.equal(log.segmentSize, 256);
     await log.appendEvents([
-      { partitionId: "bounded", payload: { value: "a".repeat(1700) } },
-      { partitionId: "bounded", payload: { value: "b".repeat(1700) } }
+      { partitionId: "bounded", payloadHash: "a".repeat(1700) },
+      { partitionId: "bounded", payloadHash: "b".repeat(1700) }
     ]);
     const segments = [...storage.objects.entries()]
       .filter(([id]) => id.includes("event-log-segment:bounded:"));
