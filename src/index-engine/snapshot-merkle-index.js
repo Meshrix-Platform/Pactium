@@ -520,34 +520,29 @@ function verifyMembershipMultiproof(proof, context = {}) {
   return expectedKeys.every((key) => seenKeys.has(key)) && seenKeys.size === new Set(expectedKeys).size;
 }
 
-// Range bounds use the generator's normalization everywhere — a missing or
-// falsy field is the empty bound, never the literal string "undefined".
-function rangeMinOf(proof) {
-  return String(proof.min ?? "");
-}
-
-function rangeMaxOf(proof) {
-  return String(proof.max ?? "￿");
-}
-
-function rangeAfterOf(proof) {
-  return String(proof.after ?? "");
+// Generator and verifier share one bound normalization: any falsy bound is
+// the open default, never the literal string "undefined" or a per-path
+// falsy coercion that could decouple entry matching from coverage checks.
+function normalizeRangeBounds(bounds = {}) {
+  return {
+    min: String(bounds.min || ""),
+    max: String(bounds.max || "\uffff"),
+    after: String(bounds.after || "")
+  };
 }
 
 function proofRangeContains(range, proof) {
   // Mirrors the generator's subtree relevance filter exactly: a subtree is
   // range-relevant only when its keyRange intersects [min, max] and can still
   // hold keys beyond the exclusive `after` cursor (keyRange.max > after).
-  if (!rangesIntersect(range, rangeMinOf(proof), rangeMaxOf(proof))) return false;
-  const after = rangeAfterOf(proof);
+  const { min, max, after } = normalizeRangeBounds(proof);
+  if (!rangesIntersect(range, min, max)) return false;
   return !after || compareIndexKeys(range.max, after) > 0;
 }
 
 function verifyRangeProof(proof, context = {}) {
   if (!proof || proof.proofType !== PACTIUM_PROOF_TYPES.indexRange) return false;
-  const min = rangeMinOf(proof);
-  const max = rangeMaxOf(proof);
-  const after = rangeAfterOf(proof);
+  const { min, max, after } = normalizeRangeBounds(proof);
   if (compareIndexKeys(min, max) > 0) return false;
   const coveredRoots = new Set();
   const leafRecords = [];
@@ -654,10 +649,9 @@ function verifyRangeProof(proof, context = {}) {
         expandedPath
       });
       if (!rootDescriptor || rootDescriptor.root !== proof.indexRoot || rootDescriptor.rootHash !== proof.rootHash) return false;
-      // A range-relevant insertion leaf belongs in `leaves` (covered above);
-      // the boundary leaf must lie outside the effective range and carry no
-      // in-range entry.
-      if (proofRangeContains(leafDescriptor.keyRange, proof)) return false;
+      // The boundary leaf is authenticated coverage of its own keyRange: its
+      // full entry list must carry no in-range key. Earlier 0.8.x proofs
+      // relied on exactly this witness for gaps inside one leaf.
       for (const entry of asArray(leafPayload.entries).map(normalizeIndexEntry)) {
         if ((!after || compareIndexKeys(entry.key, after) > 0) &&
             compareIndexKeys(entry.key, min) >= 0 &&
@@ -1323,9 +1317,7 @@ export function createVerifiableIndexEngine({ storage = createStoragePort({ inMe
 
   async function collectRangeLeafProofs(root, options = {}) {
     const indexRoot = await readIndexRoot(root);
-    const min = String(options.min || "");
-    const max = String(options.max || "\uffff");
-    const after = String(options.after || "");
+    const { min, max, after } = normalizeRangeBounds(options);
     const limit = clampLimit(options.limit, 100000);
     const scanLimit = limit + 1;
     const leaves = [];
@@ -1420,8 +1412,7 @@ export function createVerifiableIndexEngine({ storage = createStoragePort({ inMe
         nodeHash: String(item.nodeHash || "")
       }))
     }));
-    const min = String(options.min || "");
-    const after = String(options.after || "");
+    const { min, max, after } = normalizeRangeBounds(options);
     const boundaryKey = after && compareIndexKeys(after, min) > 0 ? after : min;
     return {
       protocol: PACTIUM_PROTOCOL,
@@ -1430,7 +1421,7 @@ export function createVerifiableIndexEngine({ storage = createStoragePort({ inMe
       indexRoot: range.indexRoot.root,
       rootHash: range.indexRoot.rootHash,
       min,
-      max: String(options.max || "\uffff"),
+      max,
       after,
       limit: range.limit,
       truncated: range.truncated,
@@ -1450,9 +1441,7 @@ export function createVerifiableIndexEngine({ storage = createStoragePort({ inMe
   async function scan(root, { min = "", max = "\uffff", limit = 5000, after = "" } = {}) {
     if (compareIndexKeys(min, max) > 0) return [];
     return rangeEntries(root, {
-      min: String(min || ""),
-      max: String(max || "\uffff"),
-      after: String(after || ""),
+      ...normalizeRangeBounds({ min, max, after }),
       limit: clampLimit(limit)
     });
   }

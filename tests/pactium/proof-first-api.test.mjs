@@ -1157,6 +1157,36 @@ describe("Pactium proof-first root API", () => {
     delete strippedEntriesRange.after;
     strippedEntriesRange.boundaryProof = null;
     assert.equal(engine.verifyProof(strippedEntriesRange), false);
+    // Falsy bounds normalize exactly like the generator's open defaults: a
+    // stripped proof cannot narrow the verified interval by smuggling a
+    // falsy `max`, `min`, or `after` past the coverage checks.
+    const falsyMaxRange = structuredClone(rangeProof);
+    falsyMaxRange.entries = [];
+    falsyMaxRange.max = "";
+    assert.equal(engine.verifyProof(falsyMaxRange), false);
+    const falsyMinRange = structuredClone(rangeProof);
+    falsyMinRange.entries = [];
+    falsyMinRange.min = 0;
+    assert.equal(engine.verifyProof(falsyMinRange), false);
+    const falsyAfterRange = structuredClone(afterRangeProof);
+    falsyAfterRange.after = false;
+    assert.equal(engine.verifyProof(falsyAfterRange), false);
+    // A legacy empty-range proof (no covering leaves, boundary witness only)
+    // remains verifiable when the boundary leaf authenticates the whole gap.
+    const gapKey = `${manySnapshot.chunkBoundaries[0].startKey}.5`;
+    const gapRange = await engine.proveRange(many.root, { min: gapKey, max: gapKey });
+    assert.equal(gapRange.entries.length, 0);
+    assert.equal(engine.verifyProof(gapRange), true);
+    const legacyGapRange = {
+      ...gapRange,
+      leaves: [],
+      boundaryProof: await engine.prove(many.root, gapKey)
+    };
+    assert.equal(engine.verifyProof(legacyGapRange), true);
+    // The same boundary leaf cannot vouch for a widened range: its own
+    // authenticated entries fall inside the widened interval.
+    const legacyWideRange = { ...legacyGapRange, max: "many:9999" };
+    assert.equal(engine.verifyProof(legacyWideRange), false);
     const firstLeafMissing = await engine.prove(many.root, `${manySnapshot.chunkBoundaries[0].startKey}.5`);
     const crossLeafFalseProof = structuredClone(firstLeafMissing);
     crossLeafFalseProof.key = manySnapshot.chunkBoundaries[1].startKey;
