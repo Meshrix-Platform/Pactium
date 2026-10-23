@@ -1122,12 +1122,33 @@ describe("Pactium proof-first root API", () => {
       "many:0010"
     ]);
     assert.equal(engine.verifyProof(afterRangeProof), true);
+    // An empty page at an existing cursor key verifies: `after` is exclusive,
+    // so the boundary witness may be a membership proof for that key.
+    const emptyPageAfterCursor = await engine.proveRange(many.root, {
+      min: "many:0000",
+      after: "many:0010",
+      max: "many:0010"
+    });
+    assert.equal(emptyPageAfterCursor.entries.length, 0);
+    assert.equal(engine.verifyProof(emptyPageAfterCursor), true);
     const emptyRange = await engine.proveRange(many.root, { min: "many:9000", max: "many:9999" });
     assert.equal(engine.verifyProof(emptyRange), true);
-    assert.equal(emptyRange.boundaryProof.proofType, PACTIUM_PROOF_TYPES.indexNonMembership);
     const tamperedEmptyRange = structuredClone(emptyRange);
-    tamperedEmptyRange.boundaryProof.leftBoundary = "many:9998";
-    assert.equal(engine.verifyProof(tamperedEmptyRange), false);
+    if (emptyRange.boundaryProof) {
+      assert.equal(emptyRange.boundaryProof.proofType, PACTIUM_PROOF_TYPES.indexNonMembership);
+      tamperedEmptyRange.boundaryProof.key = "many:0000";
+      assert.equal(engine.verifyProof(tamperedEmptyRange), false);
+    } else {
+      tamperedEmptyRange.leaves = [];
+      assert.equal(engine.verifyProof(tamperedEmptyRange), false);
+    }
+    // A forged empty-range claim over a populated range is refused: stripping
+    // leaves and entries leaves no authenticated coverage of the interval.
+    const forgedEmptyRange = structuredClone(rangeProof);
+    forgedEmptyRange.entries = [];
+    forgedEmptyRange.leaves = [];
+    forgedEmptyRange.boundaryProof = null;
+    assert.equal(engine.verifyProof(forgedEmptyRange), false);
     const firstLeafMissing = await engine.prove(many.root, `${manySnapshot.chunkBoundaries[0].startKey}.5`);
     const crossLeafFalseProof = structuredClone(firstLeafMissing);
     crossLeafFalseProof.key = manySnapshot.chunkBoundaries[1].startKey;
@@ -1158,12 +1179,14 @@ describe("Pactium proof-first root API", () => {
     const badParentRootProof = structuredClone(manyProof);
     badParentRootProof.path[0].nodeRoot = `cid:sha256:${"d".repeat(64)}`;
     assert.equal(engine.verifyProof(badParentRootProof), false);
-    const emptyRangeWithoutBoundary = structuredClone(emptyRange);
-    emptyRangeWithoutBoundary.boundaryProof = null;
-    assert.equal(engine.verifyProof(emptyRangeWithoutBoundary), false);
-    const emptyRangeForeignBoundary = structuredClone(emptyRange);
-    emptyRangeForeignBoundary.boundaryProof.indexRoot = `cid:sha256:${"f".repeat(64)}`;
-    assert.equal(engine.verifyProof(emptyRangeForeignBoundary), false);
+    if (emptyRange.boundaryProof) {
+      const emptyRangeWithoutBoundary = structuredClone(emptyRange);
+      emptyRangeWithoutBoundary.boundaryProof = null;
+      assert.equal(engine.verifyProof(emptyRangeWithoutBoundary), false);
+      const emptyRangeForeignBoundary = structuredClone(emptyRange);
+      emptyRangeForeignBoundary.boundaryProof.indexRoot = `cid:sha256:${"f".repeat(64)}`;
+      assert.equal(engine.verifyProof(emptyRangeForeignBoundary), false);
+    }
     assert.equal((await engine.mutate(many.root, [])).root, many.root);
     assert.equal((await engine.mutate(many.root, [{ key: "" }])).root, many.root);
     const manyAfterPut = await engine.put(many.root, "many:0400", {

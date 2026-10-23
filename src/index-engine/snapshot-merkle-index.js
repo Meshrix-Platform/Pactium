@@ -520,14 +520,13 @@ function verifyMembershipMultiproof(proof, context = {}) {
   return expectedKeys.every((key) => seenKeys.has(key)) && seenKeys.size === new Set(expectedKeys).size;
 }
 
-function effectiveRangeMinimum(proof) {
-  const min = String(proof.min);
-  const after = String(proof.after);
-  return after && compareIndexKeys(after, min) > 0 ? after : min;
-}
-
 function proofRangeContains(range, proof) {
-  return rangesIntersect(range, effectiveRangeMinimum(proof), String(proof.max));
+  // Mirrors the generator's subtree relevance filter exactly: a subtree is
+  // range-relevant only when its keyRange intersects [min, max] and can still
+  // hold keys beyond the exclusive `after` cursor (keyRange.max > after).
+  if (!rangesIntersect(range, String(proof.min), String(proof.max))) return false;
+  const after = String(proof.after || "");
+  return !after || compareIndexKeys(range.max, after) > 0;
 }
 
 function verifyRangeProof(proof, context = {}) {
@@ -611,25 +610,68 @@ function verifyRangeProof(proof, context = {}) {
   if (expectedEntries.length === 0) {
     if (matchingEntries.length > 0) return false;
     if (proof.truncated === true) return false;
-    const boundaryProof = proof.boundaryProof;
-    if (!boundaryProof) return false;
-    // The emptiness witness must be anchored to this index root and to the
-    // range's boundary key; an unattached non-membership proof is no evidence
-    // that this index was empty over the requested range.
-    const afterKey = String(proof.after || "");
-    const minKey = String(proof.min || "");
-    const boundaryKey = afterKey && compareIndexKeys(afterKey, minKey) > 0 ? afterKey : minKey;
-    if (boundaryProof.indexRoot !== proof.indexRoot || boundaryProof.rootHash !== proof.rootHash ||
-        boundaryProof.domain !== proof.domain || String(boundaryProof.key) !== boundaryKey) return false;
-    return verifyCompactNonMembershipProof(boundaryProof, context);
+    if (sortedLeafRecords.length === 0) {
+      // No leaf intersects the effective range. The only sound emptiness
+      // witness is the authenticated insertion-point leaf for the effective
+      // range start: its canonical descent path must show that no
+      // range-relevant subtree went uncovered.
+      const boundaryProof = proof.boundaryProof;
+      if (!boundaryProof || typeof boundaryProof !== "object") return false;
+      const effectiveMin = after && compareIndexKeys(after, min) > 0 ? after : min;
+      if (String(boundaryProof.key) !== effectiveMin) return false;
+      if (boundaryProof.indexRoot !== proof.indexRoot ||
+          boundaryProof.rootHash !== proof.rootHash ||
+          boundaryProof.domain !== proof.domain) return false;
+      const leafRecord = leafRecordForProof(boundaryProof, context);
+      const leafPayload = nodePayloadFromProofLeaf(boundaryProof, context);
+      if (!leafRecord || !leafPayload) return false;
+      const leafRoot = cidForCanonical(leafPayload);
+      const leafRootHash = hexFromCid(leafRoot);
+      if (!verifyFinalizedNodePayload(leafPayload, { root: leafRecord.leafRoot }, leafRoot)) return false;
+      if ((leafRecord.leafRoot && leafRecord.leafRoot !== leafRoot) ||
+          (leafRecord.leafRootHash && leafRecord.leafRootHash !== leafRootHash)) return false;
+      const leafDescriptor = descriptorFromNodePayload(leafPayload, leafRoot);
+      const expandedPath = expandProofPath(boundaryProof, context);
+      const rootDescriptor = verifyPathToRoot({
+        proof: boundaryProof,
+        leafDescriptor,
+        selectionKey: effectiveMin,
+        context,
+        expandedPath
+      });
+      if (!rootDescriptor || rootDescriptor.root !== proof.indexRoot || rootDescriptor.rootHash !== proof.rootHash) return false;
+      // A range-relevant insertion leaf belongs in `leaves` (covered above);
+      // the boundary leaf must lie outside the effective range and carry no
+      // in-range entry.
+      if (proofRangeContains(leafDescriptor.keyRange, proof)) return false;
+      for (const entry of asArray(leafPayload.entries).map(normalizeIndexEntry)) {
+        if ((!after || compareIndexKeys(entry.key, after) > 0) &&
+            compareIndexKeys(entry.key, min) >= 0 &&
+            compareIndexKeys(entry.key, max) <= 0) return false;
+      }
+      // Every sibling subtree along the descent that could hold in-range keys
+      // must be the descended child itself; anything else is uncovered range.
+      for (const pathItem of expandedPath) {
+        if (!pathItem.siblingDescriptors) return false;
+        for (const [index, descriptor] of pathItem.siblingDescriptors.entries()) {
+          if (index === pathItem.childIndex) continue;
+          if (proofRangeContains(descriptor.keyRange, proof)) return false;
+        }
+      }
+      return true;
+    }
+    // Covered leaves carry their full authenticated entry lists; the shared
+    // coverage loop below is the witness that every range-relevant subtree
+    // was inspected.
+  } else {
+    const hasLocalExtra = matchingEntries.length > expectedEntries.length;
+    if (proof.truncated === true) {
+      if (expectedEntries.length !== requestedLimit || !hasLocalExtra) return false;
+    } else if (hasLocalExtra) {
+      return false;
+    }
   }
-  const lastReturnedKey = expectedEntries.at(-1).key;
-  const hasLocalExtra = matchingEntries.length > expectedEntries.length;
-  if (proof.truncated === true) {
-    if (expectedEntries.length !== requestedLimit || !hasLocalExtra) return false;
-  } else if (hasLocalExtra) {
-    return false;
-  }
+  const lastReturnedKey = expectedEntries.length > 0 ? expectedEntries.at(-1).key : null;
   for (const record of sortedLeafRecords) {
     for (const pathItem of record.expandedPath) {
       if (!pathItem.siblingDescriptors) return false;
@@ -1293,7 +1335,9 @@ export function createVerifiableIndexEngine({ storage = createStoragePort({ inMe
           compareIndexKeys(entry.key, min) >= 0 &&
           compareIndexKeys(entry.key, max) <= 0
         );
-        if (filtered.length === 0) return;
+        // Every range-intersecting leaf is authenticated in the proof — even
+        // one with no matching entries — because its verified absence of
+        // in-range entries is what proves range emptiness to the verifier.
         leaves.push({
           leafRoot: descriptor.root,
           leafRootHash: descriptor.rootHash,
@@ -1379,7 +1423,9 @@ export function createVerifiableIndexEngine({ storage = createStoragePort({ inMe
       entries: range.entries,
       descriptorTable: table,
       leaves,
-      boundaryProof: range.entries.length === 0 ? await prove(root, boundaryKey, options) : null
+      boundaryProof: range.entries.length === 0 && range.leaves.length === 0
+        ? await prove(root, boundaryKey, options)
+        : null
     };
   }
 
