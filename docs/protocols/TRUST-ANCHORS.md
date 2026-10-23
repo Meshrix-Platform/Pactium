@@ -35,7 +35,9 @@ Signer rotation is a manifest update:
 3. Revoke the retired signer with `revokedAt` on the signer record or a `revokedSigners[]` entry.
 4. Distribute the new manifest through the host's trust-anchor channel.
 
-Pactium rejects a ledger-head signature when the signing timestamp is at or after the signer's revocation time, when the signer is outside its validity window, when roles do not include `ledger-head`, or when accepted unique signer count does not satisfy quorum.
+Pactium rejects a ledger-head signature when the signing timestamp is at or after the signer's revocation time, when the signer is outside its validity window, when roles do not include `ledger-head`, or when accepted unique signer count does not satisfy quorum. The signing timestamp is the signed ledger head's `createdAt` — unsigned signature-record timestamps are display metadata, and a missing signed timestamp fails closed wherever a revocation or validity window exists. Every supplied manifest is re-normalized before verification, so `quorum` always resolves to a positive integer and a manifest's own `manifestType` claim never skips validation.
+
+`advanceTrustedHead` called without a caller-supplied manifest returns a consistency-only result (`ok`, `consistencyOnly: true`, `trusted: false`) that carries no trusted-head store record: it verifies ledger continuation only and cannot be persisted as a trust decision.
 
 ## Witness, Cosign, Checkpoint, Gossip
 

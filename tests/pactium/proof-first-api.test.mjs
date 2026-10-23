@@ -1257,7 +1257,8 @@ describe("Pactium proof-first root API", () => {
       operationId: "workspace.write",
       workspaceId: "workspace-a",
       idempotencyKey: "same-intent",
-      input: { path: "docs/a.md" }
+      input: { path: "docs/a.md" },
+      subject: { kind: "file", ref: "docs/a.md" }
     });
     assert.equal(intent.protocol, PACTIUM_PROTOCOL);
     assert.equal(intent.envelopeKind, "operation-intent");
@@ -1271,6 +1272,13 @@ describe("Pactium proof-first root API", () => {
     assert.equal(intentReplay.replayed, true);
     const open = await pactium.lookupOpenIntent(intent.factId);
     assert.equal(open.exists, true);
+    // Caller-supplied subject descriptors bind to the fact as a digest only —
+    // the verbatim object is never a ledger-retained surface.
+    assert.equal(open.intent.subject, undefined);
+    assert.equal(
+      open.intent.subjectHash,
+      protocolHash("operation.subject", { kind: "file", ref: "docs/a.md" })
+    );
 
     const outcome = await pactium.appendOperationOutcome({
       intentId: intent.factId,
@@ -2157,6 +2165,55 @@ describe("Pactium proof-first root API", () => {
     }, {
       signatures: [signatureWithoutManifest]
     }).failures.some((failure) => failure.code === "manifest_quorum_not_met"));
+    // A manifest that merely claims the verifier-manifest type is still
+    // re-normalized: quorum can never resolve below one.
+    for (const malformed of [0, -1, "not-a-number"]) {
+      assert.ok(verifyLedgerHeadSignature(proofValue.ledger.head, {
+        manifestType: "pactium.verifier-manifest",
+        signers: manifest.signers,
+        quorum: malformed
+      }, { signatures: [] }).failures.some((failure) => failure.code === "manifest_quorum_not_met"));
+    }
+    // Revocation binds to the signed head timestamp: a forged signature-record
+    // createdAt cannot backdate around a signer's revokedAt.
+    const revokedManifest = createVerifierManifest({
+      signers: [{
+        signerId: "unit-ledger-signer",
+        algorithm: "ed25519",
+        publicKey: publicKey.export({ type: "spki", format: "pem" }),
+        roles: ["ledger-head"],
+        revokedAt: "2000-01-01T00:00:00.000Z",
+        revocationReason: "test"
+      }],
+      quorum: 1
+    });
+    const backdatedSignature = signLedgerHead(proofValue.ledger.head, {
+      privateKey,
+      signerId: "unit-ledger-signer",
+      manifest: revokedManifest,
+      createdAt: "1999-01-01T00:00:00.000Z"
+    });
+    assert.ok(verifyLedgerHeadSignature(proofValue.ledger.head, revokedManifest, {
+      signatures: [backdatedSignature]
+    }).failures.some((failure) => failure.code === "signer_revoked"));
+    const expiredManifest = createVerifierManifest({
+      signers: [{
+        signerId: "unit-ledger-signer",
+        algorithm: "ed25519",
+        publicKey: publicKey.export({ type: "spki", format: "pem" }),
+        roles: ["ledger-head"],
+        validTo: "2000-01-01T00:00:00.000Z"
+      }],
+      quorum: 1
+    });
+    assert.ok(verifyLedgerHeadSignature(proofValue.ledger.head, expiredManifest, {
+      signatures: [{
+        ...signature,
+        manifestId: expiredManifest.manifestId,
+        manifestHash: expiredManifest.manifestHash,
+        createdAt: "1999-01-01T00:00:00.000Z"
+      }]
+    }).failures.some((failure) => failure.code === "signer_expired"));
     const signedEnvelopeVerification = await pactium.verifyEnvelope(outcome, {
       verifierManifest: manifest,
       ledgerHeadSignatures: [signature]
@@ -2170,11 +2227,18 @@ describe("Pactium proof-first root API", () => {
       manifest,
       signatures: [signature]
     }).ok, true);
-    assert.equal(pactium.advanceTrustedHead({
+    const unsignedAdvance = pactium.advanceTrustedHead({
       oldHead: proofValue.ledger.previousHead,
       newHead: proofValue.ledger.head,
       proof: proofValue.ledger.consistencyProof
-    }).ok, true);
+    });
+    assert.equal(unsignedAdvance.ok, true);
+    // Without a caller-pinned manifest the result verifies continuation only —
+    // it must not carry a persistable trusted-head store.
+    assert.equal(unsignedAdvance.consistencyOnly, true);
+    assert.equal(unsignedAdvance.trusted, false);
+    assert.equal(unsignedAdvance.trustStoreType, undefined);
+    assert.equal(unsignedAdvance.lastTrustedHead, undefined);
     assert.equal(pactium.advanceTrustedHead({
       oldHead: { ...proofValue.ledger.previousHead, rootHash: "0".repeat(64) },
       newHead: proofValue.ledger.head,

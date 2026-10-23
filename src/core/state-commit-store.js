@@ -298,6 +298,19 @@ export function createStateCommitStore({
           afterRoot = (await indexEngine.createIndex([], { domain: `state:${scope}` })).root;
         }
         const mutations = asArray(input.mutations);
+        const mutationDescriptors = mutations.map((mutation) => ({
+          action: text(mutation.action, "put"),
+          key: normalizePathKey(mutation.key),
+          valueRef: text(mutation.valueRef || mutation.value),
+          valueHash: text(mutation.valueHash || protocolHash("block", {
+            valueRef: text(mutation.valueRef || mutation.value || "")
+          })),
+          metadata: asObject(mutation.metadata)
+        })).filter((mutation) => mutation.key);
+        const payloadHash = protocolHash(
+          "state-commit.payload",
+          normalizeCanonicalValue(asObject(input.payload))
+        );
         afterRoot = await mutateIndex(afterRoot, mutations, scope);
         const operationId = text(input.operationId, defaultCommitOperationId);
         const envelope = await core.recordOperation({
@@ -307,15 +320,7 @@ export function createStateCommitStore({
           returnIntentReplay: true,
           input: asObject(input.payload),
           result: { beforeRoot, afterRoot },
-          stateMutations: mutations.map((mutation) => ({
-            action: text(mutation.action, "put"),
-            key: normalizePathKey(mutation.key),
-            valueRef: text(mutation.valueRef || mutation.value),
-            valueHash: text(mutation.valueHash || protocolHash("block", {
-              valueRef: text(mutation.valueRef || mutation.value || "")
-            })),
-            metadata: asObject(mutation.metadata)
-          })).filter((mutation) => mutation.key)
+          stateMutations: mutationDescriptors
         });
         /* node:coverage ignore next 6 */
         if (envelope?.replayed) {
@@ -331,7 +336,7 @@ export function createStateCommitStore({
           beforeRoot,
           afterRoot,
           contentRefs: input.contentRefs || [],
-          payload: input.payload || {}
+          payloadHash
         });
         const commit = {
           protocol: PACTIUM_PROTOCOL,
@@ -344,8 +349,8 @@ export function createStateCommitStore({
           eventHash: event.eventHash,
           eventId: event.eventId,
           contentRefs: asArray(input.contentRefs).map((value) => text(value)).filter(Boolean),
-          mutations: normalizeCanonicalValue(mutations),
-          payload: normalizeCanonicalValue(asObject(input.payload)),
+          mutations: normalizeCanonicalValue(mutationDescriptors),
+          payloadHash,
           evidence: {
             envelopeId: envelope.envelopeId,
             outcomeId: envelope.factId,
@@ -416,7 +421,10 @@ export function createStateCommitStore({
           beforeRoot,
           afterRoot: targetRoot,
           contentRefs: input.contentRefs || [],
-          payload: { ...asObject(input.payload), restoredRoot: targetRoot }
+          payloadHash: protocolHash(
+            "state-commit.payload",
+            normalizeCanonicalValue(asObject(input.payload))
+          )
         });
         const commit = {
           protocol: PACTIUM_PROTOCOL,
@@ -430,7 +438,10 @@ export function createStateCommitStore({
           eventId: event.eventId,
           contentRefs: asArray(input.contentRefs).map((value) => text(value)).filter(Boolean),
           mutations: [],
-          payload: normalizeCanonicalValue(asObject(input.payload)),
+          payloadHash: protocolHash(
+            "state-commit.payload",
+            normalizeCanonicalValue(asObject(input.payload))
+          ),
           evidence: {
             envelopeId: envelope.envelopeId,
             outcomeId: envelope.factId,

@@ -119,7 +119,7 @@ The returned instance exposes:
 
 Records a complete operation (intent + outcome) in a single call. This is the high-level convenience API.
 
-`input` and `result`/`output` contribute to `inputHash` and `resultHash`; their original values are not copied into facts or Proof Bundles. `stateMutations` and `extensions` are explicit content-persistence surfaces.
+`input` and `result`/`output` contribute to `inputHash` and `resultHash`; their original values are not copied into facts or Proof Bundles. `stateMutations` and `extensions` are explicit content-persistence surfaces. `subject` descriptors bind to facts as `subjectHash` digests only; state-commit `payload` values persist as `payloadHash`.
 
 ```js
 const envelope = await pactium.recordOperation({
@@ -513,6 +513,8 @@ const advanced = advanceTrustedHead({
   signatures: [signature]
 });
 ```
+
+`verifyLedgerHeadSignature` re-normalizes every manifest before use — a supplied `manifestType` never skips validation, and `quorum` always resolves to a positive integer. Signer revocation and validity windows bind to the signed head's `createdAt`; unsigned signature-record timestamps are display metadata. `advanceTrustedHead` called without a manifest returns a consistency-only result (`ok`, `consistencyOnly: true`, `trusted: false`) carrying a `verifiedHead` but no trusted-head store — it verifies continuation and cannot be persisted as a trust decision.
 
 Verifier manifests support signer validity windows, signer revocation, signer rotation through manifest updates, quorum policies, external witness metadata, public checkpoint metadata, and gossip policy metadata. Production verification should use `trustPolicy: "trusted-manifest-required"` with a caller-supplied trusted manifest rather than relying on a self-carried manifest embedded in proof material.
 

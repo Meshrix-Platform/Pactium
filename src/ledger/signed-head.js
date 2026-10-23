@@ -7,6 +7,11 @@ import { asArray, asRecord, nowIso, safeText } from "../shared/records.js";
 import { createVerificationFailure } from "../verification/failure.js";
 import { verifyLedgerConsistencyProof } from "./transparency-log.js";
 
+function positiveQuorum(value) {
+  const normalized = Number(value ?? 1);
+  return Number.isSafeInteger(normalized) && normalized > 0 ? normalized : 1;
+}
+
 export function createVerifierManifest(input = {}) {
   const payload = {
     protocol: PACTIUM_PROTOCOL,
@@ -27,7 +32,7 @@ export function createVerifierManifest(input = {}) {
       revokedAt: safeText(revocation.revokedAt),
       reason: safeText(revocation.reason ?? revocation.revocationReason)
     })).filter((revocation) => revocation.signerId),
-    quorum: Math.max(1, Number(input.quorum ?? input.quorumPolicy?.ledgerHead ?? 1)),
+    quorum: positiveQuorum(input.quorum ?? input.quorumPolicy?.ledgerHead),
     quorumPolicy: normalizeCanonicalValue(asRecord(input.quorumPolicy)),
     witnesses: asArray(input.witnesses).map((witness) => ({
       witnessId: safeText(witness.witnessId ?? witness.signerId),
@@ -84,9 +89,9 @@ export function signLedgerHead(head = {}, {
 }
 
 export function verifyLedgerHeadSignature(head = {}, manifest = {}, options = {}) {
-  const verifierManifest = manifest?.manifestType === "pactium.verifier-manifest"
-    ? manifest
-    : createVerifierManifest(manifest);
+  // Always re-normalize: a manifest that merely claims the verifier-manifest
+  // type must still pass through validation (quorum floor, signer shape).
+  const verifierManifest = createVerifierManifest(manifest);
   const signatures = asArray(options.signatures ?? head.signatures ?? (head.signature ? [head.signature] : []));
   const failures = [];
   let accepted = 0;
@@ -163,11 +168,15 @@ export function verifyLedgerHeadSignature(head = {}, manifest = {}, options = {}
       }));
       continue;
     }
-    const sigTime = safeText(record.createdAt ?? head.createdAt);
+    // The signature record's own createdAt is unsigned metadata; revocation
+    // and validity windows bind to the signed head timestamp instead, so a
+    // proof cannot be backdated without the signer's private key. A missing
+    // signed timestamp fails closed whenever a window claim exists.
+    const sigTime = safeText(head.createdAt);
     const revokedRecord = revokedSignersById.get(record.signerId);
     if (signer.revokedAt || revokedRecord) {
-      const revokedAt = safeText(signer.revokedAt ?? revokedRecord?.revokedAt ?? sigTime);
-      if (!revokedAt || sigTime >= revokedAt) {
+      const revokedAt = safeText(signer.revokedAt ?? revokedRecord?.revokedAt);
+      if (!revokedAt || !sigTime || sigTime >= revokedAt) {
         failures.push(createVerificationFailure({
           layer: "ledger-head-signature",
           code: "signer_revoked",
@@ -181,7 +190,7 @@ export function verifyLedgerHeadSignature(head = {}, manifest = {}, options = {}
         continue;
       }
     }
-    if (signer.validFrom && sigTime < signer.validFrom) {
+    if (signer.validFrom && (!sigTime || sigTime < signer.validFrom)) {
       failures.push(createVerificationFailure({
         layer: "ledger-head-signature",
         code: "signer_not_yet_valid",
@@ -190,7 +199,7 @@ export function verifyLedgerHeadSignature(head = {}, manifest = {}, options = {}
       }));
       continue;
     }
-    if (signer.validTo && sigTime > signer.validTo) {
+    if (signer.validTo && (!sigTime || sigTime > signer.validTo)) {
       failures.push(createVerificationFailure({
         layer: "ledger-head-signature",
         code: "signer_expired",
@@ -268,13 +277,28 @@ export function advanceTrustedHead({
   if (failures.length > 0) {
     return { protocol: PACTIUM_PROTOCOL, ok: false, failures };
   }
+  if (!verificationManifest) {
+    // Consistency-only advancement must not be persisted as a trusted head:
+    // without a caller-pinned manifest and signature quorum there is no
+    // trust decision to record, so the result carries no trusted-head store.
+    return {
+      protocol: PACTIUM_PROTOCOL,
+      ok: true,
+      consistencyOnly: true,
+      trusted: false,
+      ledgerId: newHead.ledgerId || oldHead.ledgerId || "pactium-operation-ledger",
+      verifiedHead: newHead,
+      updatedAt: nowIso(),
+      failures: []
+    };
+  }
   return {
     protocol: PACTIUM_PROTOCOL,
     ok: true,
     trustStoreType: "pactium.trusted-head-store",
     ledgerId: newHead.ledgerId || oldHead.ledgerId || "pactium-operation-ledger",
     lastTrustedHead: newHead,
-    verifierManifestRef: manifest?.manifestId || "",
+    verifierManifestRef: verificationManifest.manifestId || "",
     updatedAt: nowIso(),
     failures: []
   };

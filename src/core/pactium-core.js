@@ -57,6 +57,14 @@ export function getPactiumInternals(core) {
   return internals;
 }
 
+function subjectHashOf(input = {}) {
+  // Caller-supplied subjects bind to facts as digests only: verbatim objects
+  // are not a documented content-persistence surface.
+  return input.subject == null
+    ? ""
+    : protocolHash("operation.subject", normalizeCanonicalValue(asRecord(input.subject)));
+}
+
 function compareStateMutationKeys(left, right) {
   const leftKey = String(left);
   const rightKey = String(right);
@@ -625,7 +633,7 @@ export function createPactium({
       inputHash,
       idempotencyReplayKey: idKey,
       idempotencyClaimKey: idClaimKey,
-      subject: normalizeCanonicalValue(asRecord(input.subject)),
+      subjectHash: subjectHashOf(input),
       causalityRefs: asArray(input.causalityRefs).map(String),
       appendConditionHash: appendCondition?.conditionHash || "",
       createdAt: nowIso()
@@ -1115,7 +1123,7 @@ export function createPactium({
         changeClaimKey,
         changeDigest,
         resultHash: protocolHash("operation.receipt.result", input.result ?? input.output ?? {}),
-        subject: normalizeCanonicalValue(asRecord(input.subject)),
+        subjectHash: subjectHashOf(input),
         hostEvidenceRefs: asArray(input.hostEvidenceRefs).map(String),
         createdAt: nowIso()
       };
@@ -1263,7 +1271,7 @@ export function createPactium({
           inputHash,
           idempotencyReplayKey: idKey,
           idempotencyClaimKey: idClaimKey,
-          subject: normalizeCanonicalValue(asRecord(input.subject)),
+          subjectHash: subjectHashOf(input),
           causalityRefs: asArray(input.causalityRefs).map(String),
           appendConditionHash: "",
           createdAt: nowIso()
