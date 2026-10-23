@@ -611,7 +611,17 @@ function verifyRangeProof(proof, context = {}) {
   if (expectedEntries.length === 0) {
     if (matchingEntries.length > 0) return false;
     if (proof.truncated === true) return false;
-    return proof.boundaryProof ? verifyCompactNonMembershipProof(proof.boundaryProof, context) : asArray(proof.leaves).length === 0;
+    const boundaryProof = proof.boundaryProof;
+    if (!boundaryProof) return false;
+    // The emptiness witness must be anchored to this index root and to the
+    // range's boundary key; an unattached non-membership proof is no evidence
+    // that this index was empty over the requested range.
+    const afterKey = String(proof.after || "");
+    const minKey = String(proof.min || "");
+    const boundaryKey = afterKey && compareIndexKeys(afterKey, minKey) > 0 ? afterKey : minKey;
+    if (boundaryProof.indexRoot !== proof.indexRoot || boundaryProof.rootHash !== proof.rootHash ||
+        boundaryProof.domain !== proof.domain || String(boundaryProof.key) !== boundaryKey) return false;
+    return verifyCompactNonMembershipProof(boundaryProof, context);
   }
   const lastReturnedKey = expectedEntries.at(-1).key;
   const hasLocalExtra = matchingEntries.length > expectedEntries.length;

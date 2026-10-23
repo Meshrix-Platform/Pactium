@@ -7,6 +7,7 @@ import { afterEach, describe, it } from "node:test";
 import { promisify } from "node:util";
 
 import {
+  cidForCanonical,
   createPactium,
   createSqliteStoragePort,
   createStoragePort,
@@ -546,6 +547,37 @@ describe("Pactium durable storage lifecycle", () => {
     await assert.rejects(() => initialization, { code: "PACTIUM_STORAGE_CLOSED" });
     await closing;
     assert.equal(await fs.stat(path.join(racingDir, "pactium-manifest.json")).then(() => true, () => false), false);
+  });
+
+  it("does not serve cached records when the durable write failed", async () => {
+    const dataDir = await tempDataDir("pactium-phantom-write-");
+    const storage = createStoragePort({ dataDir, storageBackend: "json" });
+    await storage.initialize();
+    const value = { value: "unwritten" };
+    const cid = cidForCanonical(value);
+    // Replace the cas directory with a file so the atomic block write fails.
+    const casDir = path.join(dataDir, "cas");
+    await fs.rm(casDir, { recursive: true, force: true });
+    await fs.writeFile(casDir, "obstruction");
+    await assert.rejects(() => storage.putBlock(value));
+    // A cached phantom record would answer here; the unfixed bug served the
+    // block from memory even though it was never written.
+    await assert.rejects(() => storage.getBlock(cid), { code: "ENOTDIR" });
+    await fs.rm(casDir);
+    const written = await storage.putBlock(value);
+    assert.equal(written.cid, cid);
+    assert.equal(await storage.hasBlock(cid), true);
+
+    // The same rule covers protocol objects: a failed write must not enter the cache.
+    const protocolDir = path.join(dataDir, "protocol");
+    await fs.rm(protocolDir, { recursive: true, force: true });
+    await fs.writeFile(protocolDir, "obstruction");
+    await assert.rejects(() => storage.putProtocolObject("scope", "key", { value: 1 }));
+    await assert.rejects(() => storage.getProtocolObject("scope", "key"));
+    await fs.rm(protocolDir);
+    await storage.putProtocolObject("scope", "key", { value: 1 });
+    assert.deepEqual(await storage.getProtocolObject("scope", "key"), { value: 1 });
+    await storage.close();
   });
 
   it("closes only storage owned by createPactium", async () => {

@@ -58,11 +58,23 @@ function normalizeCanonicalValueWithContext(value, depth, ctx) {
     if (Object.hasOwn(value, "$bytes")) {
       throw new TypeError("Pactium Canonical Value reserves $bytes for binary data.");
     }
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new TypeError("Pactium Canonical Value only supports plain objects.");
+    }
     const keys = Object.keys(value).sort();
     const output = {};
     for (const key of keys) {
       const nested = value[key];
-      if (nested !== undefined) output[key] = normalizeCanonicalValueWithContext(nested, depth + 1, ctx);
+      if (nested === undefined) continue;
+      const normalized = normalizeCanonicalValueWithContext(nested, depth + 1, ctx);
+      // A "__proto__" key is ordinary canonical data; plain assignment would
+      // mutate the prototype and silently drop it from the normalized output.
+      if (key === "__proto__") {
+        Object.defineProperty(output, key, { value: normalized, enumerable: true, writable: true, configurable: true });
+      } else {
+        output[key] = normalized;
+      }
     }
     return output;
   }
@@ -108,6 +120,10 @@ function writeCanonicalValue(value, depth, ctx) {
     }
     if (Object.hasOwn(value, "$bytes")) {
       throw new TypeError("Pactium Canonical Value reserves $bytes for binary data.");
+    }
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new TypeError("Pactium Canonical Value only supports plain objects.");
     }
     const keys = Object.keys(value).sort();
     let output = "{";

@@ -248,6 +248,15 @@ describe("Pactium proof-first root API", () => {
     assert.deepEqual(canonicalDecode(Buffer.from(canonicalString({ from: "string" }))), { from: "string" });
     assert.throws(() => canonicalString({ $bytes: "YQ==" }), /reserves \$bytes/);
     assert.throws(() => canonicalEncode(Number.NaN), /finite numbers/);
+    for (const nonPlain of [new Date(0), new Map([["a", 1]]), new Set([1]), new (class { x = 1 })()]) {
+      assert.throws(() => canonicalString(nonPlain), /plain objects/);
+      assert.throws(() => normalizeCanonicalValue(nonPlain), /plain objects/);
+    }
+    // "__proto__" is ordinary canonical data: it survives normalization and
+    // stays byte-identical with the single-pass serializer.
+    const protoKeyed = JSON.parse('{"__proto__":{"polluted":false},"a":1}');
+    assert.equal(canonicalString(protoKeyed), '{"__proto__":{"polluted":false},"a":1}');
+    assert.equal(canonicalString(normalizeCanonicalValue(protoKeyed)), canonicalString(protoKeyed));
   });
 
   it("persists latest-schema-only storage blocks and rejects historical directories", async () => {
@@ -1151,7 +1160,10 @@ describe("Pactium proof-first root API", () => {
     assert.equal(engine.verifyProof(badParentRootProof), false);
     const emptyRangeWithoutBoundary = structuredClone(emptyRange);
     emptyRangeWithoutBoundary.boundaryProof = null;
-    assert.equal(engine.verifyProof(emptyRangeWithoutBoundary), true);
+    assert.equal(engine.verifyProof(emptyRangeWithoutBoundary), false);
+    const emptyRangeForeignBoundary = structuredClone(emptyRange);
+    emptyRangeForeignBoundary.boundaryProof.indexRoot = `cid:sha256:${"f".repeat(64)}`;
+    assert.equal(engine.verifyProof(emptyRangeForeignBoundary), false);
     assert.equal((await engine.mutate(many.root, [])).root, many.root);
     assert.equal((await engine.mutate(many.root, [{ key: "" }])).root, many.root);
     const manyAfterPut = await engine.put(many.root, "many:0400", {

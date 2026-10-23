@@ -220,8 +220,10 @@ export function createJsonStoragePort({ dataDir = "", userDataPath = "", inMemor
       }
       return { ...existing, deduped: true };
     }
-    memoryBlocks.set(cid, record);
+    // Publish to disk before promoting the record into the cache so a failed
+    // write never leaves a phantom block that later reads would treat as stored.
     if (!inMemory) await writeJsonAtomic(blockPath(cid), record);
+    memoryBlocks.set(cid, record);
     return { ...record, deduped: false };
   }
 
@@ -286,9 +288,10 @@ export function createJsonStoragePort({ dataDir = "", userDataPath = "", inMemor
       updatedAt: nowIso()
     };
     // Store a canonical clone internally and return a separate canonical clone
-    // so that callers mutating the returned value cannot poison the cache.
-    memoryObjects.set(`${normalizedScope}/${normalizedKey}`, storedValue);
+    // so that callers mutating the returned value cannot poison the cache. The
+    // clone enters the cache only after the write has durably landed.
     if (!inMemory) await writeJsonAtomic(objectPath(normalizedScope, normalizedKey), stored);
+    memoryObjects.set(`${normalizedScope}/${normalizedKey}`, storedValue);
     return normalizeCanonicalValue(storedValue);
   }
 
