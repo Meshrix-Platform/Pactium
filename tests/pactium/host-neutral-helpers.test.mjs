@@ -192,6 +192,7 @@ describe("host-neutral helpers", () => {
       assert.equal(commit.beforeRoot, "");
       assert.ok(commit.afterRoot);
       assert.equal((await state.verifyCommit(commit.commitId)).ok, true);
+      assert.equal((await state.verifyCommit(commit.commitId)).detailsAuthenticated, true);
       assert.equal((await state.verifyCommit("missing")).ok, false);
       await storage.putProtocolObject(state.scopes.stateCommit, "broken-root", {
         ...commit,

@@ -589,14 +589,19 @@ describe("Pactium bounded runtime structures", () => {
     const commit = await state.commit({ scope: "legacy", mutations: [] });
     const verified = await state.verifyCommit(commit.commitId);
     assert.equal(verified.ok, true);
+    // The result must disclose the binding strength: a legacy event cannot
+    // authenticate record-only details, so the digest marker stays false.
+    assert.equal(verified.detailsAuthenticated, false);
     // Record-only details carry no event digest on legacy events, so a
-    // tampered mutations list cannot be detected — the binding contract
-    // applies only where the digest exists.
+    // tampered mutations list verifies at repeated-field strength and is
+    // disclosed as such instead of silently upgraded.
     await harness.storage.putProtocolObject(state.scopes.stateCommit, commit.commitId, {
       ...commit,
       mutations: [{ key: "ghost", valueRef: "cid:ghost" }]
     });
-    assert.equal((await state.verifyCommit(commit.commitId)).ok, true);
+    const legacyVerified = await state.verifyCommit(commit.commitId);
+    assert.equal(legacyVerified.ok, true);
+    assert.equal(legacyVerified.detailsAuthenticated, false);
   });
 
   it("enforces state mutation idempotency, root conflicts, indexes, and verification", async () => {

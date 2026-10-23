@@ -523,10 +523,10 @@ export function createStateCommitStore({
         event.beforeRoot === commit.beforeRoot &&
         event.afterRoot === commit.afterRoot &&
         event.payloadHash === commit.payloadHash &&
-        // Legacy events predate the details digest: the field lives inside
-        // the hashed event, so it cannot be stripped for a downgrade — when
-        // it is absent the record verifies at repeated-field strength.
-        (!event.commitDetailsHash || event.commitDetailsHash === detailsHash) &&
+        // Legacy events predate the details digest: the key must be absent
+        // entirely (a present-but-empty value is a forged downgrade, never a
+        // legacy shape), and when present it must equal the recomputed hash.
+        (!Object.hasOwn(event, "commitDetailsHash") || event.commitDetailsHash === detailsHash) &&
         Array.isArray(event.contentRefs) &&
         Array.isArray(commit.contentRefs) &&
         canonicalString(event.contentRefs) === canonicalString(commit.contentRefs) &&
@@ -549,7 +549,10 @@ export function createStateCommitStore({
           commit
         };
       }
-      return { ok: true, commit };
+      // Report the binding strength: legacy events predating the details
+      // digest verify their repeated fields only — record-only details were
+      // never committed and cannot be re-authenticated.
+      return { ok: true, commit, detailsAuthenticated: Object.hasOwn(event, "commitDetailsHash") };
     },
     async getCommitByEventHash({ scope = "default", eventHash = "" } = {}) {
       const normalizedScope = text(scope, "default");
