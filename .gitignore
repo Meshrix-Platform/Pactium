@@ -78,3 +78,7 @@ test-results/
 .gemini/
 .impeccable/
 .github/skills/
+
+# GitVault review contract refuses credential-container paths; npm settings
+# live in package.json (engines/packageManager) and CI flags instead.
+.npmrc
