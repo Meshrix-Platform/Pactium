@@ -5,6 +5,8 @@ import path from "node:path";
 import { describe, it } from "node:test";
 
 import { canonicalEncode } from "../../src/canonical/value.js";
+import { PACTIUM_PROTOCOL, PACTIUM_SCHEMA_VERSION } from "../../src/protocol/constants.js";
+import { protocolHash } from "../../src/protocol/hashing.js";
 import { createAppendOnlyEventLog } from "../../src/core/append-only-event-log.js";
 import { createContentAddressedStore } from "../../src/core/content-addressed-store.js";
 import { createStateCommitStore } from "../../src/core/state-commit-store.js";
@@ -547,6 +549,54 @@ describe("Pactium bounded runtime structures", () => {
     // An injected event log without event lookup cannot re-anchor the stored
     // record — verification fails closed instead of trusting the copy.
     assert.equal((await state.verifyCommit("commit:custom")).error, "commit_event_unverifiable");
+  });
+
+  it("verifies commits whose events predate the details digest at repeated-field strength", async () => {
+    const harness = stateHarness();
+    const legacyEvents = [];
+    const state = createStateCommitStore({
+      ...harness,
+      // A pre-digest event writer: events carry every repeated field but no
+      // commitDetailsHash, mirroring records written before the binding.
+      eventLog: {
+        async appendEvent(input) {
+          const event = {
+            protocol: PACTIUM_PROTOCOL,
+            schema: PACTIUM_SCHEMA_VERSION,
+            eventId: `legacy-event-${legacyEvents.length}`,
+            partitionId: input.partitionId,
+            operationId: input.operationId,
+            offset: legacyEvents.length,
+            beforeRoot: input.beforeRoot,
+            afterRoot: input.afterRoot,
+            contentRefs: [...(input.contentRefs || [])],
+            payloadHash: input.payloadHash || "",
+            prevEventHash: legacyEvents.at(-1)?.eventHash || "",
+            createdAt: new Date().toISOString()
+          };
+          event.eventHash = protocolHash("pactium.state-event", { ...event, eventHash: undefined });
+          legacyEvents.push(event);
+          return event;
+        },
+        async listEvents() { return [...legacyEvents].reverse(); },
+        async getEventById(_partition, eventId) {
+          return legacyEvents.find((event) => event.eventId === eventId) || null;
+        },
+        async getEvent(_partition, offset) { return legacyEvents[offset] || null; },
+        async verifyPartition() { return { ok: true, eventCount: legacyEvents.length }; }
+      }
+    });
+    const commit = await state.commit({ scope: "legacy", mutations: [] });
+    const verified = await state.verifyCommit(commit.commitId);
+    assert.equal(verified.ok, true);
+    // Record-only details carry no event digest on legacy events, so a
+    // tampered mutations list cannot be detected — the binding contract
+    // applies only where the digest exists.
+    await harness.storage.putProtocolObject(state.scopes.stateCommit, commit.commitId, {
+      ...commit,
+      mutations: [{ key: "ghost", valueRef: "cid:ghost" }]
+    });
+    assert.equal((await state.verifyCommit(commit.commitId)).ok, true);
   });
 
   it("enforces state mutation idempotency, root conflicts, indexes, and verification", async () => {

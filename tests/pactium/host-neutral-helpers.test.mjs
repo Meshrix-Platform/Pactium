@@ -359,6 +359,14 @@ describe("host-neutral helpers", () => {
         },
         allowedOperationIds: ["pactium.state.commit", "pactium.state.root.restore"]
       })).ok, true);
+      // The cited event must also hold its offset inside a valid chain:
+      // corrupting a later event breaks the partition while the cited
+      // event itself stays authentic, so the failure names the chain.
+      const eventScope = state.eventLog.protocolObjectScope;
+      const alphaSegment = await storage.getProtocolObject(eventScope, "event-log-segment:alpha:0");
+      alphaSegment[alphaSegment.length - 1].operationId = "state.forged";
+      await storage.putProtocolObject(eventScope, "event-log-segment:alpha:0", alphaSegment);
+      assert.equal((await state.verifyCommit(commit.commitId)).error, "commit_event_chain");
     } finally {
       await core.close();
       await storage.close();

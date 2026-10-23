@@ -523,7 +523,10 @@ export function createStateCommitStore({
         event.beforeRoot === commit.beforeRoot &&
         event.afterRoot === commit.afterRoot &&
         event.payloadHash === commit.payloadHash &&
-        event.commitDetailsHash === detailsHash &&
+        // Legacy events predate the details digest: the field lives inside
+        // the hashed event, so it cannot be stripped for a downgrade — when
+        // it is absent the record verifies at repeated-field strength.
+        (!event.commitDetailsHash || event.commitDetailsHash === detailsHash) &&
         Array.isArray(event.contentRefs) &&
         Array.isArray(commit.contentRefs) &&
         canonicalString(event.contentRefs) === canonicalString(commit.contentRefs) &&
