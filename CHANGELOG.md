@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 - Reject non-plain objects and preserve `__proto__` keys in Canonical Value normalization and serialization.
 - Persist storage blocks and protocol objects to disk before caching, so failed writes leave no phantom records.
 - Bind `payloadHash` into the hashed append-only event record for state commits and restores.
+- Re-anchor stored commit records to their cited hashed event in `verifyCommit`: repeated fields — including `payloadHash` — must match the authenticated event copy, so a tampered stored record can no longer pass verification on a valid event chain alone.
 - Close signed-head verification fail-open paths: signature time derives from the signed head, typed manifests normalize before validation, and consistency-only advancement no longer reports a trusted head.
 - Store operation `subject` values as digests instead of persisting caller input.
 

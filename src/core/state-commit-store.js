@@ -330,10 +330,10 @@ export function createStateCommitStore({
           );
         }
         await saveStateRoot(scope, afterRoot);
-        // The payload digest must ride inside the hashed event record: the
-        // commit's payloadHash derives its integrity from eventHash, so a
-        // stored commit cannot repoint its payload digest without breaking
-        // the event chain.
+        // The digest rides inside the hashed event record, and verifyCommit
+        // re-anchors the stored record's repeated fields to that event — a
+        // repointed payloadHash fails verification instead of standing on a
+        // broken event chain.
         const event = await resolvedEventLog.appendEvent({
           partitionId: scope,
           operationId,
@@ -471,6 +471,31 @@ export function createStateCommitStore({
           error: "commit_missing",
           commitId: text(commitId)
         };
+      }
+      // The stored record repeats fields the hashed event already
+      // authenticates. Re-anchor every repeated field — payloadHash
+      // included — to the cited event, recomputing eventHash so the event
+      // copy itself is authenticated.
+      if (typeof resolvedEventLog.getEventById !== "function") {
+        return { ok: false, error: "commit_event_unverifiable", commit };
+      }
+      const event = await resolvedEventLog.getEventById(commit.scope, commit.eventId);
+      if (!event) {
+        return { ok: false, error: "commit_event_missing", commit };
+      }
+      const boundToEvent =
+        commit.commitId === text(commitId) &&
+        event.eventId === commit.eventId &&
+        event.eventHash === commit.eventHash &&
+        event.partitionId === commit.scope &&
+        event.operationId === commit.operationId &&
+        event.beforeRoot === commit.beforeRoot &&
+        event.afterRoot === commit.afterRoot &&
+        event.payloadHash === commit.payloadHash &&
+        canonicalString(asArray(event.contentRefs)) === canonicalString(asArray(commit.contentRefs)) &&
+        protocolHash(eventHashDomain, { ...event, eventHash: undefined }) === event.eventHash;
+      if (!boundToEvent) {
+        return { ok: false, error: "commit_event_mismatch", commit };
       }
       try {
         await indexEngine.readIndexRoot(commit.afterRoot);

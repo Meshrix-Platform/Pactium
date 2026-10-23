@@ -199,6 +199,27 @@ describe("host-neutral helpers", () => {
         afterRoot: "missing-root"
       });
       assert.equal((await state.verifyCommit("broken-root")).ok, false);
+      // A stored commit that repoints only its payload digest — or cites a
+      // different/missing event — fails verification: verifyCommit binds the
+      // record's repeated fields to the hashed event it names.
+      await storage.putProtocolObject(state.scopes.stateCommit, "swapped-digest", {
+        ...commit,
+        commitId: "swapped-digest",
+        payloadHash: protocolHash("state-commit.payload", { swapped: true })
+      });
+      assert.equal((await state.verifyCommit("swapped-digest")).error, "commit_event_mismatch");
+      await storage.putProtocolObject(state.scopes.stateCommit, "orphan-event", {
+        ...commit,
+        commitId: "orphan-event",
+        eventId: "event:does-not-exist"
+      });
+      assert.equal((await state.verifyCommit("orphan-event")).error, "commit_event_missing");
+      await storage.putProtocolObject(state.scopes.stateCommit, "swapped-event-hash", {
+        ...commit,
+        commitId: "swapped-event-hash",
+        eventHash: `hash:${"f".repeat(16)}`
+      });
+      assert.equal((await state.verifyCommit("swapped-event-hash")).error, "commit_event_mismatch");
       const byEvent = await state.getCommitByEventHash({
         scope: "alpha",
         eventHash: commit.eventHash

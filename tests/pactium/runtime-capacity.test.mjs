@@ -544,6 +544,9 @@ describe("Pactium bounded runtime structures", () => {
     assert.equal(transactionCapability, "State commits");
     assert.equal(customEvents.length, 1);
     assert.ok(harness.storage.clears > 0);
+    // An injected event log without event lookup cannot re-anchor the stored
+    // record — verification fails closed instead of trusting the copy.
+    assert.equal((await state.verifyCommit("commit:custom")).error, "commit_event_unverifiable");
   });
 
   it("enforces state mutation idempotency, root conflicts, indexes, and verification", async () => {
