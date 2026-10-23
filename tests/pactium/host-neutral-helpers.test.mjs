@@ -131,11 +131,13 @@ describe("host-neutral helpers", () => {
       beforeRoot: "root-1",
       afterRoot: "root-2",
       contentRefs: ["cid:1"],
-      payload: { ok: true }
+      payloadHash: protocolHash("state-commit.payload", { ok: true })
     });
     assert.equal(locked >= 2, true);
     assert.equal(first.eventId, "workspace-a:op.one:0");
     assert.equal(second.prevEventHash, first.eventHash);
+    assert.equal(second.payloadHash, protocolHash("state-commit.payload", { ok: true }));
+    assert.equal(second.payload, undefined);
     assert.equal((await eventLog.verifyPartition("workspace-a")).ok, true);
     assert.equal((await eventLog.listEvents("workspace-a", { limit: 1 }))[0].eventId, second.eventId);
     assert.equal((await eventLog.getEvent("workspace-a", 0)).eventId, first.eventId);

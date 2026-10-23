@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { PACTIUM_PROTOCOL, PACTIUM_SCHEMA_VERSION } from "../protocol/constants.js";
 import { protocolHash } from "../protocol/hashing.js";
-import { normalizeCanonicalValue } from "../canonical/value.js";
 
 const DEFAULT_SEGMENT_SIZE = 256;
 const DEFAULT_MAX_SEGMENT_BYTES = 1024 * 1024;
@@ -107,7 +106,7 @@ export function createAppendOnlyEventLog({
         beforeRoot: text(input.beforeRoot),
         afterRoot: text(input.afterRoot),
         contentRefs: asArray(input.contentRefs).map((value) => text(value)).filter(Boolean),
-        payload: normalizeCanonicalValue(asObject(input.payload)),
+        payloadHash: text(input.payloadHash),
         prevEventHash: previousHash,
         createdAt: nowIso()
       };
