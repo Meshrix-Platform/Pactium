@@ -1149,6 +1149,14 @@ describe("Pactium proof-first root API", () => {
     forgedEmptyRange.leaves = [];
     forgedEmptyRange.boundaryProof = null;
     assert.equal(engine.verifyProof(forgedEmptyRange), false);
+    // Removing `after` must not decouple entry matching from coverage: a
+    // populated-range proof stripped to entries=[] keeps its covering leaves
+    // and is still refused, because their in-range entries remain visible.
+    const strippedEntriesRange = structuredClone(rangeProof);
+    strippedEntriesRange.entries = [];
+    delete strippedEntriesRange.after;
+    strippedEntriesRange.boundaryProof = null;
+    assert.equal(engine.verifyProof(strippedEntriesRange), false);
     const firstLeafMissing = await engine.prove(many.root, `${manySnapshot.chunkBoundaries[0].startKey}.5`);
     const crossLeafFalseProof = structuredClone(firstLeafMissing);
     crossLeafFalseProof.key = manySnapshot.chunkBoundaries[1].startKey;

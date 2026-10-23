@@ -520,20 +520,34 @@ function verifyMembershipMultiproof(proof, context = {}) {
   return expectedKeys.every((key) => seenKeys.has(key)) && seenKeys.size === new Set(expectedKeys).size;
 }
 
+// Range bounds use the generator's normalization everywhere — a missing or
+// falsy field is the empty bound, never the literal string "undefined".
+function rangeMinOf(proof) {
+  return String(proof.min ?? "");
+}
+
+function rangeMaxOf(proof) {
+  return String(proof.max ?? "￿");
+}
+
+function rangeAfterOf(proof) {
+  return String(proof.after ?? "");
+}
+
 function proofRangeContains(range, proof) {
   // Mirrors the generator's subtree relevance filter exactly: a subtree is
   // range-relevant only when its keyRange intersects [min, max] and can still
   // hold keys beyond the exclusive `after` cursor (keyRange.max > after).
-  if (!rangesIntersect(range, String(proof.min), String(proof.max))) return false;
-  const after = String(proof.after || "");
+  if (!rangesIntersect(range, rangeMinOf(proof), rangeMaxOf(proof))) return false;
+  const after = rangeAfterOf(proof);
   return !after || compareIndexKeys(range.max, after) > 0;
 }
 
 function verifyRangeProof(proof, context = {}) {
   if (!proof || proof.proofType !== PACTIUM_PROOF_TYPES.indexRange) return false;
-  const min = String(proof.min);
-  const max = String(proof.max);
-  const after = String(proof.after);
+  const min = rangeMinOf(proof);
+  const max = rangeMaxOf(proof);
+  const after = rangeAfterOf(proof);
   if (compareIndexKeys(min, max) > 0) return false;
   const coveredRoots = new Set();
   const leafRecords = [];

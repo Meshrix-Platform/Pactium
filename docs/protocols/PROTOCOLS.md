@@ -34,6 +34,8 @@ Pactium uses one shared Canonical Prolly Tree based Verifiable Index Engine for 
 
 Domain adapters convert domain material into canonical `Index Key` and `Index Value Ref` values. The engine is reused for Merkle State, Checkpoint Node, Workspace Projection, lifecycle, idempotency, and causality indexes.
 
+A range proof attests the complete requested interval: every leaf whose `keyRange` intersects the effective range is authenticated in `leaves`, and a verifier rejects the proof when any range-relevant sibling subtree is uncovered. An empty range is proven the same way — each intersecting leaf authenticates the absence of in-range entries — or, when no leaf intersects the range (a gap or beyond the keyspace), by a `boundaryProof` anchoring the canonical insertion-point leaf for the effective start key to the same index root.
+
 ## Merkle State
 
 Merkle State uses the shared Verifiable Index Engine for state roots, key membership proofs, key non-membership proofs, and diffs. State Commits bind to Operation Outcomes, not Operation Intents.
