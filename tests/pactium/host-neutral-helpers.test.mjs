@@ -18,6 +18,7 @@ import {
   createStoragePort,
   createVerifiableIndexEngine,
   inspectDataDir,
+  protocolHash,
   toCanonicalSafeValue
 } from "../../src/index.js";
 
@@ -202,6 +203,20 @@ describe("host-neutral helpers", () => {
       });
       assert.equal(byEvent.commitId, commit.commitId);
       assert.equal(await state.getCommitByEventHash({ scope: "alpha", eventHash: "" }), null);
+      // Caller payload is bound by digest only, and commit mutations record
+      // the normalized descriptors the operation fact saw — never raw input.
+      assert.equal(commit.payload, undefined);
+      assert.equal(
+        commit.payloadHash,
+        protocolHash("state-commit.payload", {})
+      );
+      assert.deepEqual(commit.mutations, [{
+        action: "put",
+        key: "a.txt",
+        valueRef: value.cid,
+        valueHash: protocolHash("block", { valueRef: value.cid }),
+        metadata: {}
+      }]);
 
       await assert.rejects(
         () => state.commit({
@@ -220,6 +235,11 @@ describe("host-neutral helpers", () => {
         payload: { reason: "cleanup" }
       });
       assert.ok(deleted.afterRoot);
+      assert.equal(deleted.payload, undefined);
+      assert.equal(
+        deleted.payloadHash,
+        protocolHash("state-commit.payload", { reason: "cleanup" })
+      );
       const replayed = await state.commit({
         scope: "alpha",
         expectedCurrentRoot: commit.afterRoot,

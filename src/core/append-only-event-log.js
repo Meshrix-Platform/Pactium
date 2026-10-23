@@ -218,8 +218,14 @@ export function createAppendOnlyEventLog({
       const meta = await loadMeta(normalizedPartition);
       const safeLimit = Math.max(1, Math.min(Number(limit || 100), 10000));
       const events = [];
+      const segments = new Map();
       for (let offset = Math.max(0, Number(afterOffset) + 1); offset < Number(meta.eventCount || 0) && events.length < safeLimit; offset += 1) {
-        events.push(await this.getEvent(normalizedPartition, offset));
+        const location = await storage.getProtocolObject(protocolObjectScope, sequenceKey(normalizedPartition, offset), null);
+        if (!location) throw new Error("Pactium event sequence index is incomplete.");
+        if (!segments.has(location.segmentIndex)) {
+          segments.set(location.segmentIndex, await loadSegment(normalizedPartition, location.segmentIndex));
+        }
+        events.push(segments.get(location.segmentIndex)[location.position]);
       }
       return { events, nextOffset: events.at(-1)?.offset ?? Number(afterOffset), eventCount: Number(meta.eventCount || 0) };
     },
