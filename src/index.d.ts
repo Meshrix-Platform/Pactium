@@ -464,6 +464,9 @@ export interface PactiumCommitVerification {
    */
   detailsAuthenticated?: boolean;
 }
+export interface PactiumStateCommitStore extends PactiumRecord {
+  verifyCommit(commitId: string): Promise<PactiumCommitVerification>;
+}
 export function createStateCommitStore(options: {
   storage: PactiumStoragePort;
   core: PactiumCore;
@@ -491,7 +494,7 @@ export function createStateCommitStore(options: {
   defaultCommitOperationId?: string;
   defaultRestoreOperationId?: string;
   withTransaction?: (task: () => unknown, options?: PactiumRecord) => Promise<unknown>;
-}): PactiumRecord;
+}): PactiumStateCommitStore;
 export function ledgerLeafHash(leaf: unknown): string;
 export function ledgerNodeHash(leftHash: string, rightHash: string): string;
 export function emptyTreeHash(): string;

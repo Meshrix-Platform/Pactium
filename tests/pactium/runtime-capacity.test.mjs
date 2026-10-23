@@ -593,14 +593,42 @@ describe("Pactium bounded runtime structures", () => {
     // authenticate record-only details, so the digest marker stays false.
     assert.equal(verified.detailsAuthenticated, false);
     // A present-but-empty digest marker is a forged downgrade, never a
-    // legacy shape — presence forces the digest check and fails closed.
-    legacyEvents[0].commitDetailsHash = "";
-    legacyEvents[0].eventHash = protocolHash("pactium.state-event", { ...legacyEvents[0], eventHash: undefined });
-    const downgraded = await state.verifyCommit(commit.commitId);
+    // legacy shape: a commit record citing a validly hashed event whose
+    // marker is empty must fail on the digest check alone — every other
+    // field bound here is self-consistent by construction.
+    const emptyMarker = {
+      protocol: PACTIUM_PROTOCOL,
+      schema: PACTIUM_SCHEMA_VERSION,
+      eventId: `legacy-event-${legacyEvents.length}`,
+      partitionId: "legacy",
+      operationId: "state.commit",
+      offset: legacyEvents.length,
+      beforeRoot: commit.beforeRoot,
+      afterRoot: commit.afterRoot,
+      contentRefs: [],
+      payloadHash: commit.payloadHash,
+      commitDetailsHash: "",
+      prevEventHash: legacyEvents.at(-1)?.eventHash || "",
+      createdAt: commit.createdAt
+    };
+    emptyMarker.eventHash = protocolHash("pactium.state-event", { ...emptyMarker, eventHash: undefined });
+    legacyEvents.push(emptyMarker);
+    await harness.storage.putProtocolObject(state.scopes.stateCommit, "commit:forged", {
+      ...commit,
+      commitId: "commit:forged",
+      eventId: emptyMarker.eventId,
+      eventHash: emptyMarker.eventHash,
+      beforeRoot: emptyMarker.beforeRoot,
+      afterRoot: emptyMarker.afterRoot,
+      payloadHash: emptyMarker.payloadHash,
+      contentRefs: [],
+      mutations: [],
+      evidence: {},
+      createdAt: emptyMarker.createdAt
+    });
+    const downgraded = await state.verifyCommit("commit:forged");
     assert.equal(downgraded.ok, false);
     assert.equal(downgraded.error, "commit_event_mismatch");
-    delete legacyEvents[0].commitDetailsHash;
-    legacyEvents[0].eventHash = protocolHash("pactium.state-event", { ...legacyEvents[0], eventHash: undefined });
     // Record-only details carry no event digest on legacy events, so a
     // tampered mutations list verifies at repeated-field strength and is
     // disclosed as such instead of silently upgraded.
