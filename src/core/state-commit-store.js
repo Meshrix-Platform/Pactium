@@ -38,6 +38,26 @@ function normalizePathKey(value) {
   return text(value).replace(/\\/g, "/").replace(/^\/+/, "");
 }
 
+function commitEvidenceOf(envelope) {
+  return {
+    envelopeId: envelope.envelopeId,
+    outcomeId: envelope.factId,
+    ledgerEventId: envelope.factRef?.ledgerEventId || "",
+    ledgerIndex: envelope.factRef?.ledgerIndex ?? -1
+  };
+}
+
+// The record-only details (mutations, evidence, createdAt) cannot repeat
+// event fields, so they ride inside the hashed event as one digest. The
+// digest covers the raw fields: any tampered shape fails normalization.
+function commitDetailsHashOf(commit) {
+  return protocolHash("state-commit.details", normalizeCanonicalValue({
+    mutations: commit?.mutations,
+    evidence: commit?.evidence,
+    createdAt: commit?.createdAt
+  }));
+}
+
 /**
  * Host-neutral state root commit helper.
  * Persists roots, commit records, and append-only events; binds optional
@@ -330,17 +350,24 @@ export function createStateCommitStore({
           );
         }
         await saveStateRoot(scope, afterRoot);
-        // The digest rides inside the hashed event record, and verifyCommit
-        // re-anchors the stored record's repeated fields to that event — a
-        // repointed payloadHash fails verification instead of standing on a
-        // broken event chain.
+        const createdAt = nowIso();
+        const normalizedMutations = normalizeCanonicalValue(mutationDescriptors);
+        const evidence = commitEvidenceOf(envelope);
+        // Every commit field is anchored into the hashed event: the repeated
+        // fields ride verbatim and the record-only details ride as
+        // commitDetailsHash, which verifyCommit re-anchors against.
         const event = await resolvedEventLog.appendEvent({
           partitionId: scope,
           operationId,
           beforeRoot,
           afterRoot,
           contentRefs: input.contentRefs || [],
-          payloadHash
+          payloadHash,
+          commitDetailsHash: commitDetailsHashOf({
+            mutations: normalizedMutations,
+            evidence,
+            createdAt
+          })
         });
         const commit = {
           protocol: PACTIUM_PROTOCOL,
@@ -353,15 +380,10 @@ export function createStateCommitStore({
           eventHash: event.eventHash,
           eventId: event.eventId,
           contentRefs: asArray(input.contentRefs).map((value) => text(value)).filter(Boolean),
-          mutations: normalizeCanonicalValue(mutationDescriptors),
+          mutations: normalizedMutations,
           payloadHash,
-          evidence: {
-            envelopeId: envelope.envelopeId,
-            outcomeId: envelope.factId,
-            ledgerEventId: envelope.factRef?.ledgerEventId || "",
-            ledgerIndex: envelope.factRef?.ledgerIndex ?? -1
-          },
-          createdAt: nowIso()
+          evidence,
+          createdAt
         };
         await saveCommit(commit);
         await saveStateMutationClaim({
@@ -419,16 +441,24 @@ export function createStateCommitStore({
           );
         }
         await saveStateRoot(scope, targetRoot);
+        const createdAt = nowIso();
+        const payloadHash = protocolHash(
+          "state-commit.payload",
+          normalizeCanonicalValue(asObject(input.payload))
+        );
+        const evidence = commitEvidenceOf(envelope);
         const event = await resolvedEventLog.appendEvent({
           partitionId: scope,
           operationId,
           beforeRoot,
           afterRoot: targetRoot,
           contentRefs: input.contentRefs || [],
-          payloadHash: protocolHash(
-            "state-commit.payload",
-            normalizeCanonicalValue(asObject(input.payload))
-          )
+          payloadHash,
+          commitDetailsHash: commitDetailsHashOf({
+            mutations: [],
+            evidence,
+            createdAt
+          })
         });
         const commit = {
           protocol: PACTIUM_PROTOCOL,
@@ -442,17 +472,9 @@ export function createStateCommitStore({
           eventId: event.eventId,
           contentRefs: asArray(input.contentRefs).map((value) => text(value)).filter(Boolean),
           mutations: [],
-          payloadHash: protocolHash(
-            "state-commit.payload",
-            normalizeCanonicalValue(asObject(input.payload))
-          ),
-          evidence: {
-            envelopeId: envelope.envelopeId,
-            outcomeId: envelope.factId,
-            ledgerEventId: envelope.factRef?.ledgerEventId || "",
-            ledgerIndex: envelope.factRef?.ledgerIndex ?? -1
-          },
-          createdAt: nowIso()
+          payloadHash,
+          evidence,
+          createdAt
         };
         await saveCommit(commit);
         await saveStateMutationClaim({
@@ -472,16 +494,25 @@ export function createStateCommitStore({
           commitId: text(commitId)
         };
       }
-      // The stored record repeats fields the hashed event already
-      // authenticates. Re-anchor every repeated field — payloadHash
-      // included — to the cited event, recomputing eventHash so the event
-      // copy itself is authenticated.
-      if (typeof resolvedEventLog.getEventById !== "function") {
+      // The stored record repeats fields the hashed event authenticates,
+      // and the event's commitDetailsHash covers the record-only details.
+      // Re-anchor every field to the cited event — recomputing eventHash so
+      // the event copy itself is authenticated — then confirm the event
+      // holds its claimed offset in a valid partition chain.
+      if (typeof resolvedEventLog.getEventById !== "function" ||
+          typeof resolvedEventLog.getEvent !== "function" ||
+          typeof resolvedEventLog.verifyPartition !== "function") {
         return { ok: false, error: "commit_event_unverifiable", commit };
       }
       const event = await resolvedEventLog.getEventById(commit.scope, commit.eventId);
       if (!event) {
         return { ok: false, error: "commit_event_missing", commit };
+      }
+      let detailsHash = "";
+      try {
+        detailsHash = commitDetailsHashOf(commit);
+      } catch {
+        detailsHash = "state-commit.details.invalid";
       }
       const boundToEvent =
         commit.commitId === text(commitId) &&
@@ -492,10 +523,18 @@ export function createStateCommitStore({
         event.beforeRoot === commit.beforeRoot &&
         event.afterRoot === commit.afterRoot &&
         event.payloadHash === commit.payloadHash &&
-        canonicalString(asArray(event.contentRefs)) === canonicalString(asArray(commit.contentRefs)) &&
+        event.commitDetailsHash === detailsHash &&
+        Array.isArray(event.contentRefs) &&
+        Array.isArray(commit.contentRefs) &&
+        canonicalString(event.contentRefs) === canonicalString(commit.contentRefs) &&
         protocolHash(eventHashDomain, { ...event, eventHash: undefined }) === event.eventHash;
       if (!boundToEvent) {
         return { ok: false, error: "commit_event_mismatch", commit };
+      }
+      const partition = await resolvedEventLog.verifyPartition(commit.scope);
+      const sequenced = await resolvedEventLog.getEvent(commit.scope, event.offset);
+      if (partition?.ok !== true || sequenced?.eventHash !== event.eventHash) {
+        return { ok: false, error: "commit_event_chain", commit };
       }
       try {
         await indexEngine.readIndexRoot(commit.afterRoot);

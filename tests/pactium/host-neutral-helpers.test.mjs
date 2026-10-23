@@ -220,6 +220,28 @@ describe("host-neutral helpers", () => {
         eventHash: `hash:${"f".repeat(16)}`
       });
       assert.equal((await state.verifyCommit("swapped-event-hash")).error, "commit_event_mismatch");
+      // A non-array contentRefs cannot pass as the event's []: shapes are
+      // compared strictly, not through coercion.
+      await storage.putProtocolObject(state.scopes.stateCommit, "swapped-refs-shape", {
+        ...commit,
+        commitId: "swapped-refs-shape",
+        contentRefs: null
+      });
+      assert.equal((await state.verifyCommit("swapped-refs-shape")).error, "commit_event_mismatch");
+      // Record-only details ride inside the hashed event as a digest:
+      // mutations and evidence cannot be rewritten without detection.
+      await storage.putProtocolObject(state.scopes.stateCommit, "swapped-mutations", {
+        ...commit,
+        commitId: "swapped-mutations",
+        mutations: []
+      });
+      assert.equal((await state.verifyCommit("swapped-mutations")).error, "commit_event_mismatch");
+      await storage.putProtocolObject(state.scopes.stateCommit, "swapped-evidence", {
+        ...commit,
+        commitId: "swapped-evidence",
+        evidence: { ...commit.evidence, ledgerEventId: "ledger:forged" }
+      });
+      assert.equal((await state.verifyCommit("swapped-evidence")).error, "commit_event_mismatch");
       const byEvent = await state.getCommitByEventHash({
         scope: "alpha",
         eventHash: commit.eventHash

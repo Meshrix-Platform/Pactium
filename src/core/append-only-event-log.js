@@ -107,6 +107,7 @@ export function createAppendOnlyEventLog({
         afterRoot: text(input.afterRoot),
         contentRefs: asArray(input.contentRefs).map((value) => text(value)).filter(Boolean),
         payloadHash: text(input.payloadHash),
+        commitDetailsHash: text(input.commitDetailsHash),
         prevEventHash: previousHash,
         createdAt: nowIso()
       };
