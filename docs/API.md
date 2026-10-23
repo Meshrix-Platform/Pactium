@@ -119,7 +119,7 @@ The returned instance exposes:
 
 Records a complete operation (intent + outcome) in a single call. This is the high-level convenience API.
 
-`input` and `result`/`output` contribute to `inputHash` and `resultHash`; their original values are not copied into facts or Proof Bundles. `stateMutations` and `extensions` are explicit content-persistence surfaces. `subject` descriptors bind to facts as `subjectHash` digests only; state-commit `payload` values persist as `payloadHash`.
+`input` and `result`/`output` contribute to `inputHash` and `resultHash`; their original values are not copied into facts or Proof Bundles. `stateMutations` and `extensions` are explicit content-persistence surfaces. `subject` descriptors bind to facts as `subjectHash` digests only; `payload` values persist as `payloadHash` — append-only events accept `input.payload` for convenience, digest it under the `pactium.event-payload` domain, and never persist the bytes.
 
 ```js
 const envelope = await pactium.recordOperation({
@@ -793,7 +793,7 @@ Bundle export accepts `{ "envelope": ... }`, `{ "envelopeId": "..." }`, `{ "id":
 import {
   PACTIUM_PROTOCOL,           // "pactium.v0.3"
   PACTIUM_SCHEMA_VERSION,     // "pactium.v0.3.schema.latest"
-  PACTIUM_PACKAGE_VERSION,    // "0.8.3"
+  PACTIUM_PACKAGE_VERSION,    // "0.8.4"
   PACTIUM_INDEX_ENGINE,       // "pactium.verifiable-index-engine"
   PACTIUM_INDEX_SPLITTER,     // "pactium-cdc-boundary"
   PACTIUM_PROOF_BUNDLE_TYPE,  // "pactium.proof-bundle.indexed"

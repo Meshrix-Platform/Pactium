@@ -4,7 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.8.4] - 2026-10-24
+
+### Changed
+
+- Append-only event records carry `payloadHash` instead of `payload`; callers pass `payloadHash` (or `payload`, which the log digests under the `pactium.event-payload` domain and does not persist). Consumers verifying stored commits recompute the digest instead of comparing payload bytes.
+- Operation facts record `subjectHash` in place of the plaintext `subject` object.
+- `signLedgerHead` binds the signature timestamp inside the signed payload; verifiers must recompute the same payload.
+- `verifyCommit` resolves to `PactiumCommitVerification` and reports `detailsAuthenticated`; the store type is declared as `PactiumStateCommitStore`.
 
 ### Security
 

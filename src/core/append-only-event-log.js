@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { PACTIUM_PROTOCOL, PACTIUM_SCHEMA_VERSION } from "../protocol/constants.js";
 import { protocolHash } from "../protocol/hashing.js";
+import { normalizeCanonicalValue } from "../canonical/value.js";
 
 const DEFAULT_SEGMENT_SIZE = 256;
 const DEFAULT_MAX_SEGMENT_BYTES = 1024 * 1024;
@@ -106,7 +107,10 @@ export function createAppendOnlyEventLog({
         beforeRoot: text(input.beforeRoot),
         afterRoot: text(input.afterRoot),
         contentRefs: asArray(input.contentRefs).map((value) => text(value)).filter(Boolean),
-        payloadHash: text(input.payloadHash),
+        // An explicit digest wins; a plaintext payload is digested under the
+        // event domain and never persisted into the record.
+        payloadHash: text(input.payloadHash) ||
+          (input.payload === undefined ? "" : protocolHash("pactium.event-payload", normalizeCanonicalValue(asObject(input.payload)))),
         commitDetailsHash: text(input.commitDetailsHash),
         prevEventHash: previousHash,
         createdAt: nowIso()
