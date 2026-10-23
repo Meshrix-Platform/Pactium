@@ -451,16 +451,30 @@ export function createAppendOnlyEventLog(options: {
   segmentSize?: number;
   maxSegmentBytes?: number;
 }): PactiumRecord;
+export interface PactiumCommitVerification {
+  ok: boolean;
+  commit?: PactiumRecord;
+  error?: string;
+  /**
+   * Whether record-only commit details (`mutations`, `evidence`,
+   * `createdAt`) were authenticated by a `commitDetailsHash` inside the
+   * hashed event. `false` means the commit verified at repeated-field
+   * strength because its event predates the digest field; callers that
+   * require detail authentication must treat that result as weaker.
+   */
+  detailsAuthenticated?: boolean;
+}
 export function createStateCommitStore(options: {
   storage: PactiumStoragePort;
   core: PactiumCore;
   indexEngine: PactiumIndexEngine;
   /**
-   * Injected append-only event log. `verifyCommit` re-anchors stored
-   * commits to their hashed events, so an injected log must expose the
-   * full read surface (`getEventById`, `getEvent`, `verifyPartition`) and
-   * share this store's `eventHashDomain`; without it verification fails
-   * closed with `commit_event_unverifiable`.
+   * Injected append-only event log. `verifyCommit` resolves to
+   * `PactiumCommitVerification` — it re-anchors stored commits to their
+   * hashed events, so an injected log must expose the full read surface
+   * (`getEventById`, `getEvent`, `verifyPartition`) and share this
+   * store's `eventHashDomain`; without it verification fails closed with
+   * `commit_event_unverifiable`.
    */
   eventLog?: PactiumRecord;
   scopes?: {

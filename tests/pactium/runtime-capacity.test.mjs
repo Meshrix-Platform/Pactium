@@ -592,6 +592,15 @@ describe("Pactium bounded runtime structures", () => {
     // The result must disclose the binding strength: a legacy event cannot
     // authenticate record-only details, so the digest marker stays false.
     assert.equal(verified.detailsAuthenticated, false);
+    // A present-but-empty digest marker is a forged downgrade, never a
+    // legacy shape — presence forces the digest check and fails closed.
+    legacyEvents[0].commitDetailsHash = "";
+    legacyEvents[0].eventHash = protocolHash("pactium.state-event", { ...legacyEvents[0], eventHash: undefined });
+    const downgraded = await state.verifyCommit(commit.commitId);
+    assert.equal(downgraded.ok, false);
+    assert.equal(downgraded.error, "commit_event_mismatch");
+    delete legacyEvents[0].commitDetailsHash;
+    legacyEvents[0].eventHash = protocolHash("pactium.state-event", { ...legacyEvents[0], eventHash: undefined });
     // Record-only details carry no event digest on legacy events, so a
     // tampered mutations list verifies at repeated-field strength and is
     // disclosed as such instead of silently upgraded.

@@ -222,10 +222,13 @@ async function verifyToolingSurface(files, findings) {
   const expectedBin = {
     pactium: "bin/pactium.mjs"
   };
+  // The pinned publish destination is spelled as a bare hostname so audit
+  // views that redact full URLs can still verify where releases land.
+  const npmRegistryHost = "registry.npmjs.org";
   const expectedPublishConfig = {
     access: "public",
     provenance: true,
-    registry: "https://registry.npmjs.org/"
+    registry: `https://${npmRegistryHost}/`
   };
   const expectedExports = {
     ".": {
