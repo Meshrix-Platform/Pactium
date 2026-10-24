@@ -110,7 +110,7 @@ export function createAppendOnlyEventLog({
         // An explicit digest wins; a plaintext payload is digested under the
         // event domain and never persisted into the record.
         payloadHash: text(input.payloadHash) ||
-          (input.payload === undefined ? "" : protocolHash("pactium.event-payload", normalizeCanonicalValue(asObject(input.payload)))),
+          (input.payload === undefined ? "" : protocolHash("pactium.event-payload", normalizeCanonicalValue(input.payload))),
         commitDetailsHash: text(input.commitDetailsHash),
         prevEventHash: previousHash,
         createdAt: nowIso()
