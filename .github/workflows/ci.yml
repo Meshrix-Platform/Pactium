@@ -23,6 +23,7 @@ jobs:
       # Upgrade npm outside the project tree: the Node 22 image bundles
       # npm 10, which refuses on devEngines.packageManager before it can
       # self-upgrade; the OIDC publish floor needs npm >= 11.5.1.
+      # publish.yml's verify job uses the same step — keep both paths aligned.
       - run: cd "$RUNNER_TEMP" && npm install -g npm@latest
       - run: npm ci
       - run: npm run verify:release
