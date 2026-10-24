@@ -158,6 +158,7 @@ describe("host-neutral helpers", () => {
     assert.equal(scalar.payloadHash, protocolHash("pactium.event-payload", "fragile"));
     assert.equal(array.payloadHash, protocolHash("pactium.event-payload", ["a", 1]));
     assert.equal(scalar.payload, undefined);
+    assert.equal(array.payload, undefined);
     assert.equal((await eventLog.verifyPartition("workspace-a")).ok, true);
     assert.equal((await eventLog.listEvents("workspace-a", { limit: 1 }))[0].eventId, array.eventId);
     assert.equal((await eventLog.getEvent("workspace-a", 0)).eventId, first.eventId);

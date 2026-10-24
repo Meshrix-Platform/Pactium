@@ -316,6 +316,7 @@ This is the first public release of Pactium as a proof-first protocol substrate.
 - Ed25519 signing support for Ledger Heads
 - Signed head verification with verifier manifest validation
 
+[0.8.4]: https://github.com/Meshrix-Platform/Pactium/releases/tag/v0.8.4
 [0.8.3]: https://github.com/Meshrix-Platform/Pactium/releases/tag/v0.8.3
 [0.8.2]: https://github.com/Meshrix-Platform/Pactium/releases/tag/v0.8.2
 [0.8.1]: https://github.com/Meshrix-Platform/Pactium/releases/tag/v0.8.1
