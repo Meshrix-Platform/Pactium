@@ -607,29 +607,22 @@ async function verifyDocumentImplementationDrift(findings) {
   const code = sourceText.join("\n");
   const packageText = JSON.stringify(packageJson);
 
-  // The runtime constant derives from the manifest — there is no literal to
-  // drift; the published declaration still carries one and must agree.
-  const constantsSource = await readText("src/protocol/constants.js");
-  const runtimeDerives =
-    /import\s+\w+\s+from\s+["'][^"']*package\.json["']\s+with\s*\{\s*type:\s*"json"/.test(constantsSource) &&
-    /PACTIUM_PACKAGE_VERSION\s*=\s*\w+\.version/.test(constantsSource);
-  if (!runtimeDerives) {
-    addFinding(
-      findings,
-      "src/protocol/constants.js",
-      "package_version_drift",
-      "PACTIUM_PACKAGE_VERSION must derive from package.json."
-    );
-  }
-  const declaredVersion =
-    /PACTIUM_PACKAGE_VERSION:\s*"([^"]+)"/.exec(await readText("src/index.d.ts"))?.[1];
-  if (declaredVersion !== packageJson.version) {
-    addFinding(
-      findings,
-      "src/index.d.ts",
-      "package_version_drift",
-      "The declared PACTIUM_PACKAGE_VERSION literal must equal package.json version."
-    );
+  // Runtime constant and published declaration both carry literals that the
+  // release-preparation flow rewrites — pin them to the manifest version.
+  const versionPins = {
+    "src/protocol/constants.js": /PACTIUM_PACKAGE_VERSION\s*=\s*"([^"]+)"/,
+    "src/index.d.ts": /PACTIUM_PACKAGE_VERSION:\s*"([^"]+)"/
+  };
+  for (const [file, pattern] of Object.entries(versionPins)) {
+    const pinned = pattern.exec(await readText(file))?.[1];
+    if (pinned !== packageJson.version) {
+      addFinding(
+        findings,
+        file,
+        "package_version_drift",
+        "PACTIUM_PACKAGE_VERSION must equal package.json version."
+      );
+    }
   }
 
   const storageAdr = await readIfExists("docs/adr/0014-storage-port-with-local-backend.md");

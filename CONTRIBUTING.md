@@ -22,7 +22,7 @@ Look for issues labeled `good first issue` or `help wanted` in [GitHub Issues](h
 ### Prerequisites
 
 - Node.js 22.19+ or Node.js 24.3+
-- npm 11.5+ (the `devEngines` floor; npm Trusted Publishing through OIDC requires it)
+- npm 11.5.1+ (the `devEngines` floor; npm Trusted Publishing through OIDC requires it)
 - Git
 
 ### Development Setup
