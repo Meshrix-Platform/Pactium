@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -225,6 +226,7 @@ async function verifyToolingSurface(files, findings) {
   // The pinned publish destination is spelled as a bare hostname so audit
   // views that redact full URLs can still verify where releases land.
   const npmRegistryHost = "registry.npmjs.org";
+  const sponsorOwner = "Unka-Malloc";
   const expectedPublishConfig = {
     access: "public",
     provenance: true,
@@ -278,6 +280,85 @@ async function verifyToolingSurface(files, findings) {
         "tooling_surface_drift",
         `package.json ${label} must match the current Pactium tooling surface.`
       );
+    }
+  }
+
+  // Every external endpoint the package metadata points at is asserted
+  // against the checkout's own configured origin (host and repository path);
+  // the publish registry stays a pinned constant. Expected values are built
+  // from bare hostnames so audit views that redact URLs can still verify
+  // where releases land. URL userinfo is parsed through URL.hostname and the
+  // raw origin string is never echoed into findings.
+  let expectedRepoHost = "";
+  let expectedRepoPath = "";
+  try {
+    const origin = execFileSync(
+      "git",
+      ["config", "--get", "remote.origin.url"],
+      { cwd: root, encoding: "utf8" }
+    ).trim();
+    const scp = /^[a-z][a-z0-9+.-]*:\/\//i.test(origin)
+      ? null
+      : origin.match(/^[^@\s]+@([^:/\s]+):(.+)$/);
+    if (scp) {
+      expectedRepoHost = scp[1].toLowerCase();
+      expectedRepoPath = scp[2];
+    } else {
+      const parsed = new URL(origin);
+      expectedRepoHost = parsed.hostname.toLowerCase();
+      expectedRepoPath = parsed.pathname;
+    }
+    expectedRepoPath = expectedRepoPath.replace(/^\//, "").replace(/\.git$/, "");
+  } catch {
+    expectedRepoHost = "";
+    expectedRepoPath = "";
+  }
+  if (!expectedRepoHost || !expectedRepoPath) {
+    addFinding(
+      findings,
+      "package.json",
+      "endpoint_host_source",
+      "Cannot derive the expected repository endpoint from remote.origin.url."
+    );
+  } else {
+    for (const [label, value, expected] of [
+      [
+        "repository.url",
+        packageJson.repository?.url,
+        `git+https://${expectedRepoHost}/${expectedRepoPath}.git`
+      ],
+      [
+        "bugs.url",
+        packageJson.bugs?.url,
+        `https://${expectedRepoHost}/${expectedRepoPath}/issues`
+      ],
+      [
+        "homepage",
+        packageJson.homepage,
+        `https://${expectedRepoHost}/${expectedRepoPath}#readme`
+      ],
+      // The sponsorship target is a pinned policy constant like the
+      // registry: it deliberately names the maintainer's sponsor page,
+      // not the repository owner.
+      [
+        "funding.url",
+        packageJson.funding?.url,
+        `https://${expectedRepoHost}/sponsors/${sponsorOwner}`
+      ],
+      [
+        "publishConfig.registry",
+        packageJson.publishConfig?.registry,
+        `https://${npmRegistryHost}/`
+      ]
+    ]) {
+      if (value !== expected) {
+        addFinding(
+          findings,
+          "package.json",
+          "endpoint_drift",
+          `package.json ${label} does not match the expected release endpoint.`
+        );
+      }
     }
   }
 
