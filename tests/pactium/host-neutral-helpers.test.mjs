@@ -138,8 +138,28 @@ describe("host-neutral helpers", () => {
     assert.equal(second.prevEventHash, first.eventHash);
     assert.equal(second.payloadHash, protocolHash("state-commit.payload", { ok: true }));
     assert.equal(second.payload, undefined);
+    // A plaintext payload is digested under the event domain and never
+    // persisted — scalars and arrays bind their real value, not an object
+    // fallback.
+    const scalar = await eventLog.appendEvent({
+      partitionId: "workspace-a",
+      operationId: "op.three",
+      beforeRoot: "root-2",
+      afterRoot: "root-3",
+      payload: "fragile"
+    });
+    const array = await eventLog.appendEvent({
+      partitionId: "workspace-a",
+      operationId: "op.four",
+      beforeRoot: "root-3",
+      afterRoot: "root-4",
+      payload: ["a", 1]
+    });
+    assert.equal(scalar.payloadHash, protocolHash("pactium.event-payload", "fragile"));
+    assert.equal(array.payloadHash, protocolHash("pactium.event-payload", ["a", 1]));
+    assert.equal(scalar.payload, undefined);
     assert.equal((await eventLog.verifyPartition("workspace-a")).ok, true);
-    assert.equal((await eventLog.listEvents("workspace-a", { limit: 1 }))[0].eventId, second.eventId);
+    assert.equal((await eventLog.listEvents("workspace-a", { limit: 1 }))[0].eventId, array.eventId);
     assert.equal((await eventLog.getEvent("workspace-a", 0)).eventId, first.eventId);
     assert.equal(await eventLog.getEvent("workspace-a", -1), null);
     assert.equal(await eventLog.getEvent("workspace-a", 1.5), null);

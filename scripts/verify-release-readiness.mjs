@@ -607,15 +607,20 @@ async function verifyDocumentImplementationDrift(findings) {
   const code = sourceText.join("\n");
   const packageText = JSON.stringify(packageJson);
 
-  const constantsSource = sourceText[0];
-  const exportedVersion = /PACTIUM_PACKAGE_VERSION\s*=\s*"([^"]+)"/.exec(constantsSource)?.[1];
-  if (exportedVersion !== packageJson.version) {
-    addFinding(
-      findings,
-      "src/protocol/constants.js",
-      "package_version_drift",
-      "PACTIUM_PACKAGE_VERSION must equal package.json version."
-    );
+  const versionPins = {
+    "src/protocol/constants.js": /PACTIUM_PACKAGE_VERSION\s*=\s*"([^"]+)"/,
+    "src/index.d.ts": /PACTIUM_PACKAGE_VERSION:\s*"([^"]+)"/
+  };
+  for (const [file, pattern] of Object.entries(versionPins)) {
+    const pinned = pattern.exec(await readText(file))?.[1];
+    if (pinned !== packageJson.version) {
+      addFinding(
+        findings,
+        file,
+        "package_version_drift",
+        "PACTIUM_PACKAGE_VERSION must equal package.json version."
+      );
+    }
   }
 
   const storageAdr = await readIfExists("docs/adr/0014-storage-port-with-local-backend.md");
