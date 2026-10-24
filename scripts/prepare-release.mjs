@@ -318,13 +318,8 @@ async function main() {
   packageLock.packages[""].version = options.version;
   await writeJson("package-lock.json", packageLock, options.dryRun, changed);
 
-  await replaceOne(
-    "src/protocol/constants.js",
-    /export const PACTIUM_PACKAGE_VERSION = "\d+\.\d+\.\d+";/g,
-    `export const PACTIUM_PACKAGE_VERSION = "${options.version}";`,
-    options.dryRun,
-    changed
-  );
+  // The runtime constant derives from the manifest — the published
+  // declaration still carries a literal to rewrite.
   await replaceOne(
     "src/index.d.ts",
     /export const PACTIUM_PACKAGE_VERSION: "\d+\.\d+\.\d+";/g,
