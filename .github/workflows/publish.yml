@@ -107,14 +107,16 @@ jobs:
             echo "Release tag ${GITHUB_REF_NAME} does not match package version v${{ needs.package-status.outputs.version }}."
             exit 1
           fi
-      # OIDC Trusted Publishing needs npm >=11.5.1 — the devEngines floor.
-      # Do not rely on the bundled CLI drifting under the requirement.
+      # Assert the OIDC Trusted Publishing npm floor declared in package.json
+      # devEngines. This job holds id-token: write, so it must never install
+      # a mutable toolchain — assert only, and let a low CLI fail the run.
       - run: |
           NPM_VERSION="$(npm --version)"
-          LOWEST="$(printf '%s\n%s\n' "$NPM_VERSION" "11.5.1" | sort -V | head -1)"
-          if [ "$LOWEST" != "11.5.1" ]; then
-            echo "npm ${NPM_VERSION} is below the 11.5.1 Trusted Publishing floor; installing npm@latest."
-            npm install -g npm@latest
+          FLOOR="$(node -p "require('./package.json').devEngines.packageManager.version.replace(/^>=/, '')")"
+          LOWEST="$(printf '%s\n%s\n' "$NPM_VERSION" "$FLOOR" | sort -V | head -1)"
+          if [ "$LOWEST" != "$FLOOR" ]; then
+            echo "npm ${NPM_VERSION} is below the ${FLOOR} Trusted Publishing floor declared in devEngines."
+            exit 1
           fi
       - run: |
           if npm view "pactium@${{ needs.package-status.outputs.version }}" version --registry=https://registry.npmjs.org/ >/dev/null 2>&1; then
